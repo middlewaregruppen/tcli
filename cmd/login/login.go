@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/amimof/tanzu-login/pkg/client"
+	"github.com/middlewaregruppen/tcli/pkg/client"
 	"github.com/spf13/cobra"
 
 	"k8s.io/client-go/tools/clientcmd"
@@ -19,7 +19,7 @@ var (
 
 func NewCmdLogin() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "login CLUSTER_NAME",
+		Use:   "login",
 		Short: "Authenticate user with Tanzu namespaces and clusters",
 		Long:  "",
 		RunE: func(cmd *cobra.Command, args []string) (err error) {

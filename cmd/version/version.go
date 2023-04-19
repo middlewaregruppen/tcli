@@ -23,10 +23,10 @@ var (
 func NewCmdVersion(w io.Writer) *cobra.Command {
 	versionCmd := &cobra.Command{
 		Use:     "version",
-		Short:   "Prints the tanzu-login version",
-		Example: `tanzu-login version`,
+		Short:   "Prints the tcli version",
+		Example: `tcli version`,
 		Run: func(_ *cobra.Command, _ []string) {
-			fmt.Printf("tanzu-login version %v\n", VERSION)
+			fmt.Printf("tcli version %v\n", VERSION)
 			fmt.Printf("built %v from commit %v branch %s", DATE, COMMIT, BRANCH)
 		},
 	}

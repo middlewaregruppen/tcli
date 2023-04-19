@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/amimof/tanzu-login/cmd/clusters"
-	"github.com/amimof/tanzu-login/cmd/login"
-	"github.com/amimof/tanzu-login/cmd/logout"
+	"github.com/middlewaregruppen/tcli/cmd/clusters"
+	"github.com/middlewaregruppen/tcli/cmd/login"
+	"github.com/middlewaregruppen/tcli/cmd/logout"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -28,10 +28,10 @@ func NewDefaultCommand() *cobra.Command {
 	c := &cobra.Command{
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		Use:           "tanzu-login",
+		Use:           "tcli",
 		Short:         "A command line tool that simplifies authentication to Tanzu namespaces and clusters",
 		Long: `A command line tool that simplifies authentication to Tanzu namespaces and clusters.
-	tanzu-login is a simple CLI tool to:
+	tcli is a simple CLI tool to:
 	- Simplify login process over the default vpshere plugin
 	`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
@@ -68,7 +68,7 @@ func NewDefaultCommand() *cobra.Command {
 	c.PersistentFlags().StringVarP(&tanzuUsername, "username", "u", "", "Username to authenticate.")
 	c.PersistentFlags().StringVarP(&tanzuPassword, "password", "p", "", "Password to use for authentication.")
 	c.PersistentFlags().BoolVarP(&insecureSkipVerify, "insecure", "i", true, "Skip certificate verification (this is insecure).")
-	c.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", fmt.Sprintf("%s/.kube/tanzu-login", homedir), "Path to kubeconfig file.")
+	c.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", fmt.Sprintf("%s/.kube/tcli", homedir), "Path to kubeconfig file.")
 
 	// Setup sub-commands
 	c.AddCommand(login.NewCmdLogin())

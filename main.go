@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/amimof/tanzu-login/cmd"
+	"github.com/middlewaregruppen/tcli/cmd"
 	"github.com/sirupsen/logrus"
 )
 

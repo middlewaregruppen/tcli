@@ -1,4 +1,4 @@
-module github.com/amimof/tanzu-login
+module github.com/middlewaregruppen/tcli
 
 go 1.19
 

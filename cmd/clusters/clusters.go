@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/amimof/tanzu-login/pkg/client"
+	"github.com/middlewaregruppen/tcli/pkg/client"
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/tools/clientcmd"
 )
