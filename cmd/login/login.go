@@ -7,6 +7,7 @@ import (
 
 	"github.com/middlewaregruppen/tcli/pkg/client"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -22,13 +23,21 @@ func NewCmdLogin() *cobra.Command {
 		Use:   "login",
 		Short: "Authenticate user with Tanzu namespaces and clusters",
 		Long:  "",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if err := viper.BindPFlags(cmd.Flags()); err != nil {
+				return err
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 
-			tanzuServer, _ := cmd.Flags().GetString("server")
-			tanzuUsername, _ := cmd.Flags().GetString("username")
-			tanzuPassword, _ := cmd.Flags().GetString("password")
-			insecureSkipVerify, _ := cmd.Flags().GetBool("insecure")
-			kubeconfig, _ := cmd.Flags().GetString("kubeconfig")
+			tanzuServer := viper.GetString("server")
+			tanzuUsername := viper.GetString("username")
+			tanzuPassword := viper.GetString("password")
+			tanzuCluster := viper.GetString("tanzucluster")
+			tanzuNamespace := viper.GetString("tanzunamespace")
+			insecureSkipVerify := viper.GetBool("insecure")
+			kubeconfig := viper.GetString("kubeconfig")
 
 			u, err := url.Parse(tanzuServer)
 			if err != nil {

@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -23,6 +24,11 @@ var (
 	verbosity          string
 	kubeconfig         string
 )
+
+func init() {
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix("TCLI")
+}
 
 func NewDefaultCommand() *cobra.Command {
 	c := &cobra.Command{
@@ -41,6 +47,10 @@ func NewDefaultCommand() *cobra.Command {
 				return err
 			}
 			logrus.SetLevel(lvl)
+
+			if err := viper.BindPFlags(cmd.Flags()); err != nil {
+				return err
+			}
 
 			// Check if kubeconfig exists, create if it doesn't
 			if _, err := os.Stat(kubeconfig); errors.Is(err, os.ErrNotExist) {

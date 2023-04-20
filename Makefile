@@ -50,7 +50,7 @@ $(TBIN)/golangci-lint: PACKAGE=github.com/golangci/golangci-lint/cmd/golangci-li
 # Tests
 .PHONY: lint
 lint: | $(GOCILINT) ; $(info $(M) running golangci-lint) @ ## Runs static code analysis using golangci-lint
-	$Q $(GOCILINT) run
+	$Q $(GOCILINT) run --timeout=5m
 
 .PHONY: test
 test: ; $(info $(M) running go test) @ ## Runs unit tests
