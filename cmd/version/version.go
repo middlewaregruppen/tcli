@@ -2,7 +2,6 @@ package version
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
 )
@@ -20,14 +19,16 @@ var (
 	DATE string
 )
 
-func NewCmdVersion(w io.Writer) *cobra.Command {
+func NewCmdVersion() *cobra.Command {
 	versionCmd := &cobra.Command{
 		Use:     "version",
 		Short:   "Prints the tcli version",
 		Example: `tcli version`,
 		Run: func(_ *cobra.Command, _ []string) {
-			fmt.Printf("tcli version %v\n", VERSION)
-			fmt.Printf("built %v from commit %v branch %s", DATE, COMMIT, BRANCH)
+			fmt.Printf("Version %s%v%s\t\n", colorGreen, VERSION, colorReset)
+			fmt.Printf("Built: %v\t\n", DATE)
+			fmt.Printf("Commit: %v\t\n", COMMIT)
+			fmt.Printf("Branch: %v\t\n", BRANCH)
 		},
 	}
 	return versionCmd

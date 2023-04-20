@@ -8,6 +8,7 @@ import (
 	"github.com/middlewaregruppen/tcli/cmd/clusters"
 	"github.com/middlewaregruppen/tcli/cmd/login"
 	"github.com/middlewaregruppen/tcli/cmd/logout"
+	"github.com/middlewaregruppen/tcli/cmd/version"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -81,6 +82,7 @@ func NewDefaultCommand() *cobra.Command {
 	c.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", fmt.Sprintf("%s/.kube/tcli", homedir), "Path to kubeconfig file.")
 
 	// Setup sub-commands
+	c.AddCommand(version.NewCmdVersion())
 	c.AddCommand(login.NewCmdLogin())
 	c.AddCommand(logout.NewCmdLogout())
 	c.AddCommand(clusters.NewCmdClusters())
