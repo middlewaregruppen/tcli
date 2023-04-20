@@ -6,6 +6,7 @@ import (
 
 	"github.com/middlewaregruppen/tcli/pkg/client"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -18,12 +19,18 @@ func NewCmdClusters() *cobra.Command {
 		Use:   "clusters",
 		Short: "List clusters within a Tanzu namespace",
 		Long:  "",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if err := viper.BindPFlags(cmd.Flags()); err != nil {
+				return err
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 
-			tanzuServer, _ := cmd.Flags().GetString("server")
-			tanzuUsername, _ := cmd.Flags().GetString("username")
-			insecureSkipVerify, _ := cmd.Flags().GetBool("insecure")
-			kubeconfig, _ := cmd.Flags().GetString("kubeconfig")
+			tanzuServer := viper.GetString("server")
+			tanzuUsername := viper.GetString("username")
+			insecureSkipVerify := viper.GetBool("insecure")
+			kubeconfig := viper.GetString("kubeconfig")
 
 			u, err := url.Parse(tanzuServer)
 			if err != nil {
