@@ -113,6 +113,34 @@ func (r *RestClient) Clusters(ns string) (*v1alpha2.TanzuKubernetesClusterList, 
 	return &clusterlist, nil
 }
 
+func (r *RestClient) Cluster(ns, name string) (*v1alpha2.TanzuKubernetesCluster, error) {
+	if len(ns) == 0 {
+		ns = "default"
+	}
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s:6443/apis/run.tanzu.vmware.com/v1alpha2/namespaces/%s/tanzukubernetesclusters/%s", r.u.String(), ns, name), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = map[string][]string{
+		"Content-Type":  {"application/json"},
+		"Authorization": {fmt.Sprintf("Bearer %s", r.Token)},
+	}
+	resp, err := r.c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	body, err := handleResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	var cluster v1alpha2.TanzuKubernetesCluster
+	err = json.Unmarshal(body, &cluster)
+	if err != nil {
+		return nil, err
+	}
+	return &cluster, nil
+}
+
 func (r *RestClient) Login(u, p string) error {
 
 	r.username = u
