@@ -28,7 +28,7 @@ export CGO_ENABLED=0
 all: | $(BIN) ; $(info $(M) building executable to $(BUILDPATH)) @ ## Build program binary
 	$Q $(GO) build \
 		-tags release \
-		-ldflags '-X main.VERSION=${VERSION} -X main.COMMIT=${COMMIT} -X main.BRANCH=${BRANCH} -X main.GOVERSION=${GOVERSION}' \
+		-ldflags '-X ${MODULE}/cmd/version.VERSION=${VERSION} -X ${MODULE}/cmd/version.COMMIT=${COMMIT} -X ${MODULE}/cmd/version.BRANCH=${BRANCH} -X ${MODULE}/cmd/version.GOVERSION=${GOVERSION} -X ${MODULE}/cmd/version.DATE=${DATE}' \
 		-o $(BUILDPATH) main.go
 
 # Tools
