@@ -79,7 +79,7 @@ func NewDefaultCommand() *cobra.Command {
 	c.PersistentFlags().StringVarP(&tanzuUsername, "username", "u", "", "Username to authenticate.")
 	c.PersistentFlags().StringVarP(&tanzuPassword, "password", "p", "", "Password to use for authentication.")
 	c.PersistentFlags().BoolVarP(&insecureSkipVerify, "insecure", "i", true, "Skip certificate verification (this is insecure).")
-	c.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", fmt.Sprintf("%s/.kube/tcli", homedir), "Path to kubeconfig file.")
+	c.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", fmt.Sprintf("%s/.kube/config", homedir), "Path to kubeconfig file.")
 
 	// Setup sub-commands
 	c.AddCommand(version.NewCmdVersion())
