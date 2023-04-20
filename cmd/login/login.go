@@ -34,8 +34,8 @@ func NewCmdLogin() *cobra.Command {
 			tanzuServer := viper.GetString("server")
 			tanzuUsername := viper.GetString("username")
 			tanzuPassword := viper.GetString("password")
-			tanzuCluster := viper.GetString("tanzucluster")
-			tanzuNamespace := viper.GetString("tanzunamespace")
+			tanzuCluster := viper.GetString("cluster")
+			tanzuNamespace := viper.GetString("namespace")
 			insecureSkipVerify := viper.GetBool("insecure")
 			kubeconfig := viper.GetString("kubeconfig")
 
@@ -120,6 +120,7 @@ func NewCmdLogin() *cobra.Command {
 				conf.Clusters[res.GuestClusterServer] = cluster
 				conf.AuthInfos[authName] = auth
 				conf.Contexts[tanzuCluster] = context
+				conf.CurrentContext = tanzuCluster
 
 				// Write back to kubeconfig
 				err = clientcmd.WriteToFile(*conf, kubeconfig)

@@ -3,7 +3,7 @@
 
 `tcli` is a command line utility for managing VMWare Tanzu namespaces and clusters
 
-**Work in progress** *tcli is still under active development and most features are still in an idéa phase. Please check in from time to time for follow the progress* 🧡
+**Work in progress** *tcli is still under active development and most features are still in an idéa phase. Please check in from time to time to follow the progress* 🧡
 
 
 ## Login to Tanzu Supervisor Cluster
@@ -60,6 +60,6 @@ Flags:
   -v, --verbosity string    number for the log level verbosity (debug, info, warn, error, fatal, panic) (default "info")
 ```
 
-## Getting startet
+## Getting started
 
-Download tcli from [Releases](https://github.com/middlewaregruppen/tcli/releases)
+Download pre-built binaries from [Releases](https://github.com/middlewaregruppen/tcli/releases)
