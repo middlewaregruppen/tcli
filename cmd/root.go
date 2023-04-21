@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/middlewaregruppen/tcli/cmd/clusters"
 	"github.com/middlewaregruppen/tcli/cmd/inspect"
+	"github.com/middlewaregruppen/tcli/cmd/list"
 	"github.com/middlewaregruppen/tcli/cmd/login"
 	"github.com/middlewaregruppen/tcli/cmd/logout"
 	"github.com/middlewaregruppen/tcli/cmd/version"
@@ -86,8 +86,8 @@ func NewDefaultCommand() *cobra.Command {
 	c.AddCommand(version.NewCmdVersion())
 	c.AddCommand(login.NewCmdLogin())
 	c.AddCommand(logout.NewCmdLogout())
-	c.AddCommand(clusters.NewCmdClusters())
 	c.AddCommand(inspect.NewCmdInspect())
+	c.AddCommand(list.NewCmdList())
 
 	return c
 }
