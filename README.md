@@ -7,36 +7,30 @@
 
 
 ## Login to Tanzu Supervisor Cluster
-The `login` command will authenticate the user using username/password. This will store session credentials in a temporary kubeconfig file. It's temporary because we will use the kubeconfig file with other commands without having to provide credentials each time.
-
+The `login` command will authenticate the user using their SSO credentials. 
 ```bash
-tcli login -s https://supervisor.local -u bobby -p 'MyP5ssW0rD'
+tcli login -s https://supervisor.local -u beyonce -p 'MyP5ssW0rD'
 ```
 
-## Flag values in env vars
-You can use environment variables prefixed with `TCLI_` so that you don't have to provide flags for each command. For example:
-```bash
-export TCLI_SERVER="https://supervisor.local"
-export TCLI_USERNAME="bobby"
-export TCLI_PASSWORD="MyP5ssW0rD"
-$ tcli login
-$ tcli clusters
-```
-
-## List clusters within a namespace
-After you have logged in, the cli will print a list of namespaces your account has access to. You may list clusters within each namespace with following. If no namespace is defined, then "default" will be used.
-```bash
-tcli clusters -n dev
-```
-
-## Login to a cluster
-The architecture of Tanzu does not allow you to use the same credentials for the supervisor cluster and guest clusters. So we have to log in to each cluster separately. You can do this easily with following
+**Pro Tip!** You can use environment variables prefixed with `TCLI_` so that you don't have to provide them for each command. For example:
 
 ```bash
-tcli login -n mynamespace -c mycluster
+# Listing namespaces 
+$ tcli list namespaces
+beyonces-ns
+cardis-ns
+
+# Listing clusters
+$ tcli list clusters -n beyonces-ns
+NAME          CONTROL PLANE   WORKER   TKR NAME                           AGE     READY   TKR COMPATIBLE   UPDATES AVAILABLE
+beyonce-test   1               2        v1.22.9---vmware.1-tkg.1.cc71bc8   21d     True    True             [1.23.8+vmware.3-tkg.1]
+beyonce-prod   1               2        v1.21.6---vmware.1-tkg.1.b3d708a   15d     True    True             [1.22.9+vmware.1-tkg.1.cc71bc8]
+
+# Login to a cluster 
+$ tcli login beyonce-prod -n beyonces-ns
 ```
 
-The login command will update your `kubeconfig` by adding data so you can continue interacting with the clusters using `kubectl`
+*The architecture of Tanzu does not allow you to use the same credentials for the supervisor cluster and guest clusters. So we have to log in to each cluster separately*
 
 ## CLI Usage
 ```

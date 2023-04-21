@@ -24,7 +24,16 @@ func NewCmdList() *cobra.Command {
 		Aliases: []string{"ls"},
 		Args:    cobra.ExactArgs(1),
 		Short:   "List clusters and namespaces",
-		Long:    "",
+		Long: `List clusters and namespaces
+Examples:
+	# List namespaces
+	tcli list namespaces
+
+	# List clusters in a namespace
+	tcli list clusters -n NAMESPACE
+
+	Use "tcli --help" for a list of global command-line options (applies to all commands).
+	`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlags(cmd.Flags()); err != nil {
 				return err
