@@ -87,9 +87,14 @@ func NewCmdInspect() *cobra.Command {
 			buf := bytes.Buffer{}
 			yamlEncoder := yaml.NewEncoder(&buf)
 			yamlEncoder.SetIndent(2)
-			yamlEncoder.Encode(cluster)
-			buf.WriteTo(os.Stdout)
-
+			err = yamlEncoder.Encode(cluster)
+			if err != nil {
+				return err
+			}
+			_, err = buf.WriteTo(os.Stdout)
+			if err != nil {
+				return err
+			}
 			return nil
 		},
 	}
