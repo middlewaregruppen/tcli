@@ -14,7 +14,12 @@ The first thing you'll want to do is probably logging in. The `login` command wi
 tcli login -s https://supervisor.local -u beyonce -p 'MyP5ssW0rD'
 ```
 
-**Pro Tip!** Too many flags? You can use environment variables prefixed with `TCLI_` so you don't have to provide them each time.
+Too many flags? You can use environment variables prefixed with `TCLI_` so you don't have to provide them each time. For example
+```bash
+export TCLI_SERVER=https://supervisor.local
+export TCLI_USERNAME=beyonce
+export TCLI_PASSWORD="MyP5ssW0rD"
+```
 
 Other useful things you can do
 ```bash
