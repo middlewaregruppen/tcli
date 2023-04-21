@@ -117,6 +117,12 @@ func NewCmdLogin() *cobra.Command {
 					return err
 				}
 
+				// Update namespace field in context for supervisor server.
+				// This allows us to run commands that require the --namespace flag without having to providing the flag
+				if _, ok := conf.Contexts[u.Host]; ok {
+					conf.Contexts[u.Host].Namespace = tanzuNamespace
+				}
+
 				conf.Clusters[res.GuestClusterServer] = cluster
 				conf.AuthInfos[authName] = auth
 				conf.Contexts[tanzuCluster] = context

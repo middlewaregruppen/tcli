@@ -1,13 +1,16 @@
-package clusters
+package inspect
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 
 	"github.com/middlewaregruppen/tcli/pkg/client"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -15,10 +18,11 @@ var (
 	tanzuNamespace string
 )
 
-func NewCmdClusters() *cobra.Command {
+func NewCmdInspect() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "clusters",
-		Short: "List clusters within a Tanzu namespace",
+		Use:   "inspect",
+		Short: "Inspect a specific cluster within a namespace",
+		Args:  cobra.ExactArgs(1),
 		Long:  "",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlags(cmd.Flags()); err != nil {
@@ -28,6 +32,7 @@ func NewCmdClusters() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
 
+			tanzuCluster := args[0]
 			tanzuServer := viper.GetString("server")
 			tanzuUsername := viper.GetString("username")
 			insecureSkipVerify := viper.GetBool("insecure")
@@ -74,14 +79,21 @@ func NewCmdClusters() *cobra.Command {
 				tanzuNamespace = conf.Contexts[contextName].Namespace
 			}
 
-			clusterlist, err := c.Clusters(tanzuNamespace)
+			cluster, err := c.Cluster(tanzuNamespace, tanzuCluster)
 			if err != nil {
 				return err
 			}
 
-			fmt.Printf("%d clusters in %s:\n", len(clusterlist.Items), tanzuNamespace)
-			for _, n := range clusterlist.Items {
-				fmt.Println(n.Name)
+			buf := bytes.Buffer{}
+			yamlEncoder := yaml.NewEncoder(&buf)
+			yamlEncoder.SetIndent(2)
+			err = yamlEncoder.Encode(cluster)
+			if err != nil {
+				return err
+			}
+			_, err = buf.WriteTo(os.Stdout)
+			if err != nil {
+				return err
 			}
 			return nil
 		},
