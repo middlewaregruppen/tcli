@@ -1,5 +1,5 @@
 # tcli
-[![Release](https://github.com/middlewaregruppen/tcli/actions/workflows/release.yaml/badge.svg)](https://github.com/middlewaregruppen/tcli/actions/workflows/release.yaml)
+[![Go](https://github.com/middlewaregruppen/tcli/actions/workflows/go.yaml/badge.svg)](https://github.com/middlewaregruppen/tcli/actions/workflows/go.yaml)
 
 `tcli` is a command line utility for managing VMWare Tanzu namespaces and clusters
 
