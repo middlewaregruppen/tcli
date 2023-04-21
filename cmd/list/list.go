@@ -1,13 +1,16 @@
-package clusters
+package list
 
 import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
+	"strings"
 
 	"github.com/middlewaregruppen/tcli/pkg/client"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -15,11 +18,22 @@ var (
 	tanzuNamespace string
 )
 
-func NewCmdClusters() *cobra.Command {
+func NewCmdList() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "clusters",
-		Short: "List clusters within a Tanzu namespace",
-		Long:  "",
+		Use:     "list RESOURCE",
+		Aliases: []string{"ls"},
+		Args:    cobra.ExactArgs(1),
+		Short:   "List clusters and namespaces",
+		Long: `List clusters and namespaces
+Examples:
+	# List namespaces
+	tcli list namespaces
+
+	# List clusters in a namespace
+	tcli list clusters -n NAMESPACE
+
+	Use "tcli --help" for a list of global command-line options (applies to all commands).
+	`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlags(cmd.Flags()); err != nil {
 				return err
@@ -30,6 +44,7 @@ func NewCmdClusters() *cobra.Command {
 
 			tanzuServer := viper.GetString("server")
 			tanzuUsername := viper.GetString("username")
+			tanzuPassword := viper.GetString("password")
 			insecureSkipVerify := viper.GetBool("insecure")
 			kubeconfig := viper.GetString("kubeconfig")
 
@@ -74,15 +89,41 @@ func NewCmdClusters() *cobra.Command {
 				tanzuNamespace = conf.Contexts[contextName].Namespace
 			}
 
-			clusterlist, err := c.Clusters(tanzuNamespace)
-			if err != nil {
-				return err
+			a := strings.ToLower(args[0])
+
+			// Print list of namespaces
+			if a == "namespaces" || a == "ns" {
+				err = c.Login(tanzuUsername, tanzuPassword)
+				if err != nil {
+					return err
+				}
+				nsList, err := c.Namespaces()
+				if err != nil {
+					return err
+				}
+				for _, n := range nsList {
+					fmt.Println(n.Namespace)
+				}
 			}
 
-			fmt.Printf("%d clusters in %s:\n", len(clusterlist.Items), tanzuNamespace)
-			for _, n := range clusterlist.Items {
-				fmt.Println(n.Name)
+			// Print list of clusters
+			if a == "clusters" || a == "clu" {
+				objs, err := c.Clusters(tanzuNamespace)
+				if err != nil {
+					return err
+				}
+				printer := printers.NewTablePrinter(printers.PrintOptions{})
+				err = printer.PrintObj(objs, os.Stdout)
+				if err != nil {
+					return err
+				}
 			}
+
+			// clusterlist, err := c.Clusters(tanzuNamespace)
+			// if err != nil {
+			// 	return err
+			// }
+
 			return nil
 		},
 	}

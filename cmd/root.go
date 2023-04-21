@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/middlewaregruppen/tcli/cmd/clusters"
 	"github.com/middlewaregruppen/tcli/cmd/inspect"
+	"github.com/middlewaregruppen/tcli/cmd/list"
 	"github.com/middlewaregruppen/tcli/cmd/login"
 	"github.com/middlewaregruppen/tcli/cmd/logout"
 	"github.com/middlewaregruppen/tcli/cmd/version"
@@ -41,6 +41,14 @@ func NewDefaultCommand() *cobra.Command {
 		Long: `A command line tool that simplifies authentication to Tanzu namespaces and clusters.
 	tcli is a simple CLI tool to:
 	- Simplify login process over the default vpshere plugin
+
+	Flags can be prefixed with TCLI_ and therefore omitted from the command line
+	
+	export TCLI_SERVER=https://supervisor.local
+	export TCLI_USERNAME=bob
+	export TCLI_PASSWORD=mypassword
+
+	Use "tcli --help" for a list of global command-line options (applies to all commands).
 	`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			logrus.SetOutput(os.Stdout)
@@ -86,8 +94,8 @@ func NewDefaultCommand() *cobra.Command {
 	c.AddCommand(version.NewCmdVersion())
 	c.AddCommand(login.NewCmdLogin())
 	c.AddCommand(logout.NewCmdLogout())
-	c.AddCommand(clusters.NewCmdClusters())
 	c.AddCommand(inspect.NewCmdInspect())
+	c.AddCommand(list.NewCmdList())
 
 	return c
 }

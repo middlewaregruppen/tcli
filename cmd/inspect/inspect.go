@@ -20,10 +20,16 @@ var (
 
 func NewCmdInspect() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "inspect",
+		Use:   "inspect CLUSTER",
 		Short: "Inspect a specific cluster within a namespace",
 		Args:  cobra.ExactArgs(1),
-		Long:  "",
+		Long: `Inspect a specific cluster within a namespace
+Examples:
+	# Inspecting will return the raw cluster specification in YAML format
+	tcli inspect NAME -n NAMESPACE
+
+	Use "tcli --help" for a list of global command-line options (applies to all commands).
+	`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlags(cmd.Flags()); err != nil {
 				return err

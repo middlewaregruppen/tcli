@@ -12,6 +12,7 @@ import (
 	"net/url"
 
 	"github.com/vmware-tanzu/tanzu-framework/apis/run/v1alpha2"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type RestClient struct {
@@ -85,7 +86,7 @@ func (r *RestClient) Namespaces() ([]Namespace, error) {
 	return namespaces, nil
 }
 
-func (r *RestClient) Clusters(ns string) (*v1alpha2.TanzuKubernetesClusterList, error) {
+func (r *RestClient) Clusters(ns string) (*v1.Table, error) {
 	if len(ns) == 0 {
 		ns = "default"
 	}
@@ -95,6 +96,7 @@ func (r *RestClient) Clusters(ns string) (*v1alpha2.TanzuKubernetesClusterList, 
 	}
 	req.Header = map[string][]string{
 		"Content-Type":  {"application/json"},
+		"Accept":        {"application/json;as=Table;g=meta.k8s.io;v=v1"},
 		"Authorization": {fmt.Sprintf("Bearer %s", r.Token)},
 	}
 	resp, err := r.c.Do(req)
@@ -105,7 +107,8 @@ func (r *RestClient) Clusters(ns string) (*v1alpha2.TanzuKubernetesClusterList, 
 	if err != nil {
 		return nil, err
 	}
-	var clusterlist v1alpha2.TanzuKubernetesClusterList
+	//var clusterlist v1alpha2.TanzuKubernetesClusterList
+	var clusterlist v1.Table
 	err = json.Unmarshal(body, &clusterlist)
 	if err != nil {
 		return nil, err

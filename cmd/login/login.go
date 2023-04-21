@@ -14,15 +14,30 @@ import (
 )
 
 var (
-	tanzuCluster   string
 	tanzuNamespace string
 )
 
 func NewCmdLogin() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "login",
+		Use:   "login CLUSTER",
+		Args:  cobra.MaximumNArgs(1),
 		Short: "Authenticate user with Tanzu namespaces and clusters",
-		Long:  "",
+		Long: `Authenticate user with Tanzu namespaces and clusters
+Examples:
+	# Login to the supervisor cluster
+	tcli -s SERVER -u USER -p PASSWORD login
+
+	# Flags can be prefixed with TCLI_ and therefore omitted from the command line
+	export TCLI_SERVER=https://supervisor.local
+	export TCLI_USERNAME=bob
+	export TCLI_PASSWORD=mypassword
+	tcli login
+
+	# Login to a tanzu cluster in a namespace
+	tcli login CLUSTER -n NAMESPACE
+
+	Use "tcli --help" for a list of global command-line options (applies to all commands).
+	`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlags(cmd.Flags()); err != nil {
 				return err
@@ -34,7 +49,6 @@ func NewCmdLogin() *cobra.Command {
 			tanzuServer := viper.GetString("server")
 			tanzuUsername := viper.GetString("username")
 			tanzuPassword := viper.GetString("password")
-			tanzuCluster := viper.GetString("cluster")
 			tanzuNamespace := viper.GetString("namespace")
 			insecureSkipVerify := viper.GetBool("insecure")
 			kubeconfig := viper.GetString("kubeconfig")
@@ -93,7 +107,8 @@ func NewCmdLogin() *cobra.Command {
 			}
 
 			// Login to cluster if both flags are present
-			if len(tanzuCluster) > 0 && len(tanzuNamespace) > 0 {
+			if len(args) > 0 && len(tanzuNamespace) > 0 {
+				tanzuCluster := args[0]
 				res, err := c.LoginCluster(tanzuCluster, tanzuNamespace)
 				if err != nil {
 					return err
@@ -139,7 +154,6 @@ func NewCmdLogin() *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().StringVarP(&tanzuCluster, "cluster", "c", "", "Name of the Tanzu Kubernetes Cluster to authenticate against.")
 	c.Flags().StringVarP(&tanzuNamespace, "namespace", "n", "", "Namespace in which the Tanzu Kubernetes cluster resides.")
 	return c
 }
