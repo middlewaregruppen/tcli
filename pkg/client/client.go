@@ -175,7 +175,10 @@ func (r *RestClient) Login(u, p string) error {
 }
 
 func (r *RestClient) LoginCluster(cluster, namespace string) (*LoginClusterResponse, error) {
-	data := fmt.Sprintf("{\"guest_cluster_name\":\"%s\", \"guest_cluster_namespace\":\"%s\"}", cluster, namespace)
+	data := fmt.Sprintf("{\"guest_cluster_name\":\"%s\"}", cluster)
+	if len(namespace) > 0 {
+		data = fmt.Sprintf("{\"guest_cluster_name\":\"%s\", \"guest_cluster_namespace\":\"%s\"}", cluster, namespace)
+	}
 	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/wcp/login", r.u.String()), bytes.NewBuffer([]byte(data)))
 	if err != nil {
 		return nil, err

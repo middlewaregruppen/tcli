@@ -35,7 +35,7 @@ beyonce-test   1               2        v1.22.9---vmware.1-tkg.1.cc71bc8   21d  
 beyonce-prod   1               2        v1.21.6---vmware.1-tkg.1.b3d708a   15d     True    True             [1.22.9+vmware.1-tkg.1.cc71bc8]
 
 # Logging in to a cluster will add a new context to your kubectl config file (kubeconfig)
-$ tcli login beyonce-prod -n beyonces-ns
+$ tcli login beyonce-prod
 $ kubectl get pods -A
 ```
 

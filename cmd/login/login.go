@@ -19,8 +19,9 @@ var (
 
 func NewCmdLogin() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "login CLUSTER",
-		Args:  cobra.MaximumNArgs(1),
+		Use: "login CLUSTER",
+		//Args:  cobra.MaximumNArgs(1),
+		Args:  cobra.MinimumNArgs(0),
 		Short: "Authenticate user with Tanzu namespaces and clusters",
 		Long: `Authenticate user with Tanzu namespaces and clusters
 Examples:
@@ -33,8 +34,14 @@ Examples:
 	export TCLI_PASSWORD=mypassword
 	tcli login
 
-	# Login to a tanzu cluster in a namespace
-	tcli login CLUSTER -n NAMESPACE
+	# Login to a tanzu cluster
+	tcli login CLUSTER
+
+	# Login to multiple tanzu clusters in one go
+	tcli login CLUSTER1 CLUSTER2 CLUSTER3 ...
+
+	# Login to a tanzu clusters in the same namespace
+	tcli login CLUSTER1 CLUSTER2 -n NAMESPACE
 
 	Use "tcli --help" for a list of global command-line options (applies to all commands).
 	`,
@@ -106,9 +113,9 @@ Examples:
 				fmt.Println(n.Namespace)
 			}
 
-			// Login to cluster if both flags are present
-			if len(args) > 0 && len(tanzuNamespace) > 0 {
-				tanzuCluster := args[0]
+			// Range over args and perform login on each of them
+			for _, arg := range args {
+				tanzuCluster := arg
 				res, err := c.LoginCluster(tanzuCluster, tanzuNamespace)
 				if err != nil {
 					return err
