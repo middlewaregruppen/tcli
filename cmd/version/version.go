@@ -25,7 +25,7 @@ func NewCmdVersion() *cobra.Command {
 		Short:   "Prints the tcli version",
 		Example: `tcli version`,
 		Run: func(_ *cobra.Command, _ []string) {
-			fmt.Printf("Version %s%v%s\t\n", colorGreen, VERSION, colorReset)
+			fmt.Printf("Version: %s%v%s\t\n", colorGreen, VERSION, colorReset)
 			fmt.Printf("Built: %v\t\n", DATE)
 			fmt.Printf("Commit: %v\t\n", COMMIT)
 			fmt.Printf("Branch: %v\t\n", BRANCH)
