@@ -32,6 +32,9 @@ Examples:
 	# List clusters in a namespace
 	tcli list clusters -n NAMESPACE
 
+	# List releases
+	tcli list releases
+
 	Use "tcli --help" for a list of global command-line options (applies to all commands).
 	`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
@@ -90,43 +93,59 @@ Examples:
 			}
 
 			a := strings.ToLower(args[0])
-
-			// Print list of namespaces
-			if a == "namespaces" || a == "ns" {
-				err = c.Login(tanzuUsername, tanzuPassword)
-				if err != nil {
-					return err
-				}
-				nsList, err := c.Namespaces()
-				if err != nil {
-					return err
-				}
-				for _, n := range nsList {
-					fmt.Println(n.Namespace)
-				}
+			switch a {
+			case "namespaces", "ns":
+				return listNamespaces(c, tanzuUsername, tanzuPassword)
+			case "clusters", "clu", "tkc":
+				return listClusters(c, tanzuNamespace)
+			case "releases", "rel", "tkr":
+				return listReleases(c)
+			default:
+				return fmt.Errorf("%s is not a valid resource", a)
 			}
-
-			// Print list of clusters
-			if a == "clusters" || a == "clu" {
-				objs, err := c.Clusters(tanzuNamespace)
-				if err != nil {
-					return err
-				}
-				printer := printers.NewTablePrinter(printers.PrintOptions{})
-				err = printer.PrintObj(objs, os.Stdout)
-				if err != nil {
-					return err
-				}
-			}
-
-			// clusterlist, err := c.Clusters(tanzuNamespace)
-			// if err != nil {
-			// 	return err
-			// }
-
-			return nil
 		},
 	}
 	c.Flags().StringVarP(&tanzuNamespace, "namespace", "n", "", "Namespace in which the Tanzu Kubernetes cluster resides.")
 	return c
+}
+
+func listClusters(c *client.RestClient, ns string) error {
+	objs, err := c.Clusters(ns)
+	if err != nil {
+		return err
+	}
+	printer := printers.NewTablePrinter(printers.PrintOptions{})
+	err = printer.PrintObj(objs, os.Stdout)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func listReleases(c *client.RestClient) error {
+	objs, err := c.ReleasesTable()
+	if err != nil {
+		return err
+	}
+	printer := printers.NewTablePrinter(printers.PrintOptions{})
+	err = printer.PrintObj(objs, os.Stdout)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func listNamespaces(c *client.RestClient, username, password string) error {
+	err := c.Login(username, password)
+	if err != nil {
+		return err
+	}
+	nsList, err := c.Namespaces()
+	if err != nil {
+		return err
+	}
+	for _, n := range nsList {
+		fmt.Println(n.Namespace)
+	}
+	return nil
 }
