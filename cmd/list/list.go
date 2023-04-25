@@ -6,10 +6,12 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"syscall"
 
 	"github.com/middlewaregruppen/tcli/pkg/client"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/term"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -98,6 +100,16 @@ Examples:
 			a := strings.ToLower(args[0])
 			switch a {
 			case "namespaces", "ns":
+				// Read from stdin if password isn't set anywhere
+				if len(tanzuPassword) == 0 {
+					fmt.Printf("Password:")
+					bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+					if err != nil {
+						return err
+					}
+					tanzuPassword = string(bytePassword)
+					fmt.Printf("\n")
+				}
 				return listNamespaces(c, tanzuUsername, tanzuPassword)
 			case "clusters", "clu", "tkc":
 				return listClusters(c, tanzuNamespace)
