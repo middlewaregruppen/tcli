@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"syscall"
 
 	"github.com/middlewaregruppen/tcli/cmd/inspect"
 	"github.com/middlewaregruppen/tcli/cmd/list"
@@ -11,6 +12,7 @@ import (
 	"github.com/middlewaregruppen/tcli/cmd/logout"
 	"github.com/middlewaregruppen/tcli/cmd/version"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/term"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 
@@ -60,6 +62,17 @@ func NewDefaultCommand() *cobra.Command {
 
 			if err := viper.BindPFlags(cmd.Flags()); err != nil {
 				return err
+			}
+
+			// Read from stdin if password isn't set anywhere
+			if viper.GetString("password") == "" {
+				fmt.Printf("Password:")
+				bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+				if err != nil {
+					return err
+				}
+				cmd.Flags().Set("password", string(bytePassword))
+				fmt.Printf("\n")
 			}
 
 			// Check if kubeconfig exists, create if it doesn't
