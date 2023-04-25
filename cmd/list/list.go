@@ -32,6 +32,9 @@ Examples:
 	# List clusters in a namespace
 	tcli list clusters -n NAMESPACE
 
+	# List releases
+	tcli list releases
+
 	Use "tcli --help" for a list of global command-line options (applies to all commands).
 	`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
@@ -119,11 +122,18 @@ Examples:
 				}
 			}
 
-			// clusterlist, err := c.Clusters(tanzuNamespace)
-			// if err != nil {
-			// 	return err
-			// }
-
+			// Print list of releases (tkr)
+			if a == "releases" {
+				objs, err := c.ReleasesTable()
+				if err != nil {
+					return err
+				}
+				printer := printers.NewTablePrinter(printers.PrintOptions{})
+				err = printer.PrintObj(objs, os.Stdout)
+				if err != nil {
+					return err
+				}
+			}
 			return nil
 		},
 	}
