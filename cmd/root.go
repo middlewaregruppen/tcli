@@ -71,7 +71,10 @@ func NewDefaultCommand() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				cmd.Flags().Set("password", string(bytePassword))
+				err = cmd.Flags().Set("password", string(bytePassword))
+				if err != nil {
+					return err
+				}
 				fmt.Printf("\n")
 			}
 
