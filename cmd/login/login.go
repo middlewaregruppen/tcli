@@ -107,7 +107,9 @@ Examples:
 			context := api.NewContext()
 			context.Cluster = u.Host
 			context.AuthInfo = authName
-			context.Namespace = ns[len(ns)-1].Namespace
+			if len(ns) > 0 {
+				context.Namespace = ns[len(ns)-1].Namespace
+			}
 
 			// Read kubeconfig from file
 			conf, err := clientcmd.LoadFromFile(kubeconfig)
