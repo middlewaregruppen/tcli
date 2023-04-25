@@ -141,6 +141,32 @@ func (r *RestClient) ReleasesTable() (*v1.Table, error) {
 	return &releases, nil
 }
 
+func (r *RestClient) AddonsTable() (*v1.Table, error) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s:6443/apis/run.tanzu.vmware.com/v1alpha2/tanzukubernetesaddons?limit=500", r.u.String()), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = map[string][]string{
+		"Content-Type":  {"application/json"},
+		"Accept":        {"application/json;as=Table;g=meta.k8s.io;v=v1"},
+		"Authorization": {fmt.Sprintf("Bearer %s", r.Token)},
+	}
+	resp, err := r.c.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	body, err := handleResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+	var addons v1.Table
+	err = json.Unmarshal(body, &addons)
+	if err != nil {
+		return nil, err
+	}
+	return &addons, nil
+}
+
 func (r *RestClient) Releases() (*v1alpha2.TanzuKubernetesReleaseList, error) {
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s:6443/apis/run.tanzu.vmware.com/v1alpha2/tanzukubernetesreleases?limit=500", r.u.String()), nil)
 	if err != nil {

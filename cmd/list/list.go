@@ -35,6 +35,9 @@ Examples:
 	# List releases
 	tcli list releases
 
+	# List addons
+	tcli list addons
+
 	Use "tcli --help" for a list of global command-line options (applies to all commands).
 	`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
@@ -100,6 +103,8 @@ Examples:
 				return listClusters(c, tanzuNamespace)
 			case "releases", "rel", "tkr":
 				return listReleases(c)
+			case "addons", "tka":
+				return listAddons(c)
 			default:
 				return fmt.Errorf("%s is not a valid resource", a)
 			}
@@ -146,6 +151,19 @@ func listNamespaces(c *client.RestClient, username, password string) error {
 	}
 	for _, n := range nsList {
 		fmt.Println(n.Namespace)
+	}
+	return nil
+}
+
+func listAddons(c *client.RestClient) error {
+	objs, err := c.AddonsTable()
+	if err != nil {
+		return err
+	}
+	printer := printers.NewTablePrinter(printers.PrintOptions{})
+	err = printer.PrintObj(objs, os.Stdout)
+	if err != nil {
+		return err
 	}
 	return nil
 }
