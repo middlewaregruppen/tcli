@@ -3,12 +3,13 @@ module github.com/middlewaregruppen/tcli
 go 1.19
 
 require (
-	github.com/goretk/gore v0.11.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.15.0
 	github.com/vmware-tanzu/tanzu-framework/apis/run v0.0.0-20230419030809-7081502ebf68
+	golang.org/x/term v0.6.0
 	gopkg.in/yaml.v3 v3.0.1
+	k8s.io/apimachinery v0.24.2
 	k8s.io/cli-runtime v0.24.0
 	k8s.io/client-go v0.24.2
 )
@@ -60,12 +61,9 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
-	golang.org/x/arch v0.0.0-20220412001346-fc48f9fe4c15 // indirect
-	golang.org/x/mod v0.8.0 // indirect
 	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/oauth2 v0.3.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect
-	golang.org/x/term v0.6.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
@@ -76,7 +74,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/api v0.24.2 // indirect
 	k8s.io/apiextensions-apiserver v0.24.2 // indirect
-	k8s.io/apimachinery v0.24.2 // indirect
 	k8s.io/component-base v0.24.2 // indirect
 	k8s.io/klog/v2 v2.60.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20221207184640-f3cff1453715 // indirect
