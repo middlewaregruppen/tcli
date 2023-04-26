@@ -4,10 +4,12 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/url"
+	"syscall"
 
 	"github.com/middlewaregruppen/tcli/pkg/client"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/term"
 
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -48,6 +50,19 @@ Examples:
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if err := viper.BindPFlags(cmd.Flags()); err != nil {
 				return err
+			}
+			// Read from stdin if password isn't set anywhere
+			if len(viper.GetString("password")) == 0 {
+				fmt.Printf("Password:")
+				bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+				if err != nil {
+					return err
+				}
+				err = cmd.Flags().Set("password", string(bytePassword))
+				if err != nil {
+					return err
+				}
+				fmt.Printf("\n")
 			}
 			return nil
 		},
@@ -92,6 +107,9 @@ Examples:
 			context := api.NewContext()
 			context.Cluster = u.Host
 			context.AuthInfo = authName
+			if len(ns) > 0 {
+				context.Namespace = ns[len(ns)-1].Namespace
+			}
 
 			// Read kubeconfig from file
 			conf, err := clientcmd.LoadFromFile(kubeconfig)
@@ -101,6 +119,7 @@ Examples:
 			conf.Clusters[u.Host] = cluster
 			conf.AuthInfos[authName] = auth
 			conf.Contexts[u.Host] = context
+			conf.CurrentContext = u.Host
 
 			// Write back to kubeconfig
 			err = clientcmd.WriteToFile(*conf, kubeconfig)
