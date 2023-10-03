@@ -17,6 +17,7 @@ import (
 
 var (
 	tanzuNamespace string
+	silent         bool
 )
 
 func NewCmdLogin() *cobra.Command {
@@ -127,9 +128,11 @@ Examples:
 				return err
 			}
 
-			fmt.Printf("You have access to following %d namespaces:\n", len(ns))
-			for _, n := range ns {
-				fmt.Println(n.Namespace)
+			if !silent {
+				fmt.Printf("You have access to following %d namespaces:\n", len(ns))
+				for _, n := range ns {
+					fmt.Println(n.Namespace)
+				}
 			}
 
 			// Range over args and perform login on each of them
@@ -181,5 +184,6 @@ Examples:
 		},
 	}
 	c.Flags().StringVarP(&tanzuNamespace, "namespace", "n", "", "Namespace in which the Tanzu Kubernetes cluster resides.")
+	c.Flags().BoolVar(&silent, "silent", false, "Silent mode - supress output")
 	return c
 }
