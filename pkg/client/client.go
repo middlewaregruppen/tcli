@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 
 	"github.com/vmware-tanzu/tanzu-framework/apis/run/v1alpha2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -83,6 +84,12 @@ func (r *RestClient) Namespaces() ([]Namespace, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Sort namespaces by name
+	sort.SliceStable(namespaces, func(i, j int) bool {
+		return namespaces[i].Namespace < namespaces[j].Namespace
+	})
+
 	return namespaces, nil
 }
 
