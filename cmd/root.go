@@ -9,6 +9,7 @@ import (
 	"github.com/middlewaregruppen/tcli/cmd/list"
 	"github.com/middlewaregruppen/tcli/cmd/login"
 	"github.com/middlewaregruppen/tcli/cmd/logout"
+	"github.com/middlewaregruppen/tcli/cmd/use"
 	"github.com/middlewaregruppen/tcli/cmd/version"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/clientcmd"
@@ -96,6 +97,7 @@ func NewDefaultCommand() *cobra.Command {
 	c.AddCommand(logout.NewCmdLogout())
 	c.AddCommand(inspect.NewCmdInspect())
 	c.AddCommand(list.NewCmdList())
+	c.AddCommand(use.NewCmdUse())
 
 	return c
 }
