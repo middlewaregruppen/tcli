@@ -36,7 +36,8 @@ jobs:
       uses: ncipollo/release-action@v1
       with:
         draft: true
-        artif  packages:
+        artifacts: "./bin/*"
+
   packages:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
