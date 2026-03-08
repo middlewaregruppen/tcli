@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
+	"github.com/middlewaregruppen/tcli/cmd/environment"
 	"github.com/middlewaregruppen/tcli/cmd/inspect"
 	"github.com/middlewaregruppen/tcli/cmd/list"
 	"github.com/middlewaregruppen/tcli/cmd/login"
@@ -26,6 +28,7 @@ var (
 	insecureSkipVerify bool
 	verbosity          string
 	kubeconfig         string
+	timeout            time.Duration
 )
 
 func init() {
@@ -65,7 +68,7 @@ func NewDefaultCommand() *cobra.Command {
 
 			// Check if kubeconfig exists, create if it doesn't
 			if _, err := os.Stat(kubeconfig); errors.Is(err, os.ErrNotExist) {
-				_, err = os.OpenFile(kubeconfig, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0666)
+				_, err = os.OpenFile(kubeconfig, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o666)
 				if err != nil {
 					return err
 				}
@@ -84,6 +87,7 @@ func NewDefaultCommand() *cobra.Command {
 		logrus.Fatal(err)
 	}
 	// Setup flags
+	c.PersistentFlags().DurationVar(&timeout, "timeout", 30*time.Second, "How long to wait for an operation before giving up")
 	c.PersistentFlags().StringVarP(&verbosity, "verbosity", "v", "info", "number for the log level verbosity (debug, info, warn, error, fatal, panic)")
 	c.PersistentFlags().StringVarP(&tanzuServer, "server", "s", "", "Address of the server to authenticate against.")
 	c.PersistentFlags().StringVarP(&tanzuUsername, "username", "u", "", "Username to authenticate.")
@@ -98,6 +102,7 @@ func NewDefaultCommand() *cobra.Command {
 	c.AddCommand(inspect.NewCmdInspect())
 	c.AddCommand(list.NewCmdList())
 	c.AddCommand(use.NewCmdUse())
+	c.AddCommand(environment.NewCmdEnvironment())
 
 	return c
 }

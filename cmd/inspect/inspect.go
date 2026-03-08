@@ -2,6 +2,7 @@ package inspect
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -14,9 +15,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-var (
-	tanzuNamespace string
-)
+var tanzuNamespace string
 
 func NewCmdInspect() *cobra.Command {
 	c := &cobra.Command{
@@ -37,6 +36,8 @@ Examples:
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			ctx, cancel := context.WithTimeout(context.Background(), viper.GetDuration("timeout"))
+			defer cancel()
 
 			tanzuCluster := args[0]
 			tanzuServer := viper.GetString("server")
@@ -85,7 +86,7 @@ Examples:
 				tanzuNamespace = conf.Contexts[contextName].Namespace
 			}
 
-			cluster, err := c.Cluster(tanzuNamespace, tanzuCluster)
+			cluster, err := c.Cluster(ctx, tanzuNamespace, tanzuCluster)
 			if err != nil {
 				return err
 			}

@@ -1,6 +1,7 @@
 package list
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -16,9 +17,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-var (
-	tanzuNamespace string
-)
+var tanzuNamespace string
 
 func NewCmdList() *cobra.Command {
 	c := &cobra.Command{
@@ -49,6 +48,8 @@ Examples:
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			ctx, cancel := context.WithTimeout(context.Background(), viper.GetDuration("timeout"))
+			defer cancel()
 
 			tanzuServer := viper.GetString("server")
 			tanzuUsername := viper.GetString("username")
@@ -110,13 +111,13 @@ Examples:
 					tanzuPassword = string(bytePassword)
 					fmt.Printf("\n")
 				}
-				return listNamespaces(c, tanzuUsername, tanzuPassword)
+				return listNamespaces(ctx, c, tanzuUsername, tanzuPassword)
 			case "clusters", "clu", "tkc":
-				return listClusters(c, tanzuNamespace)
+				return listClusters(ctx, c, tanzuNamespace)
 			case "releases", "rel", "tkr":
-				return listReleases(c)
+				return listReleases(ctx, c)
 			case "addons", "tka":
-				return listAddons(c)
+				return listAddons(ctx, c)
 			default:
 				return fmt.Errorf("%s is not a valid resource", a)
 			}
@@ -126,8 +127,8 @@ Examples:
 	return c
 }
 
-func listClusters(c *client.RestClient, ns string) error {
-	objs, err := c.Clusters(ns)
+func listClusters(ctx context.Context, c *client.RestClient, ns string) error {
+	objs, err := c.Clusters(ctx, ns)
 	if err != nil {
 		return err
 	}
@@ -139,8 +140,8 @@ func listClusters(c *client.RestClient, ns string) error {
 	return nil
 }
 
-func listReleases(c *client.RestClient) error {
-	objs, err := c.ReleasesTable()
+func listReleases(ctx context.Context, c *client.RestClient) error {
+	objs, err := c.ReleasesTable(ctx)
 	if err != nil {
 		return err
 	}
@@ -152,12 +153,12 @@ func listReleases(c *client.RestClient) error {
 	return nil
 }
 
-func listNamespaces(c *client.RestClient, username, password string) error {
-	err := c.Login(username, password)
+func listNamespaces(ctx context.Context, c *client.RestClient, username, password string) error {
+	err := c.Login(ctx, username, password)
 	if err != nil {
 		return err
 	}
-	nsList, err := c.Namespaces()
+	nsList, err := c.Namespaces(ctx)
 	if err != nil {
 		return err
 	}
@@ -167,8 +168,8 @@ func listNamespaces(c *client.RestClient, username, password string) error {
 	return nil
 }
 
-func listAddons(c *client.RestClient) error {
-	objs, err := c.AddonsTable()
+func listAddons(ctx context.Context, c *client.RestClient) error {
+	objs, err := c.AddonsTable(ctx)
 	if err != nil {
 		return err
 	}
