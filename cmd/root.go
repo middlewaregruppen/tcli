@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/middlewaregruppen/tcli/cmd/environment"
 	"github.com/middlewaregruppen/tcli/cmd/inspect"
 	"github.com/middlewaregruppen/tcli/cmd/list"
 	"github.com/middlewaregruppen/tcli/cmd/login"
@@ -102,7 +101,6 @@ func NewDefaultCommand() *cobra.Command {
 	c.AddCommand(inspect.NewCmdInspect())
 	c.AddCommand(list.NewCmdList())
 	c.AddCommand(use.NewCmdUse())
-	c.AddCommand(environment.NewCmdEnvironment())
 
 	return c
 }
