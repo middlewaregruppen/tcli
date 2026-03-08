@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -16,17 +17,56 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+var ErrClusterNotFound = errors.New("cluster not found")
+
 type RestClient struct {
 	u        *url.URL
 	c        *http.Client
+	cred     ReqInjector
 	username string
 	password string
 	Token    string
 }
 
+type ReqInjector interface {
+	Inject(*http.Request) error
+}
+
+type basicCredentials struct {
+	username string
+	password string
+}
+
+func (c *basicCredentials) Inject(r *http.Request) error {
+	r.Header.Add("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s:%s", c.username, c.password))))
+	return nil
+}
+
+type tokenCredentials string
+
+func (c *tokenCredentials) Inject(r *http.Request) error {
+	r.Header.Add("Authorization", fmt.Sprintf("Bearer %v", c))
+	return nil
+}
+
+func TokenCredentials(token string) ReqInjector {
+	t := tokenCredentials(token)
+	return &t
+}
+
+func BasicCredentials(username, password string) ReqInjector {
+	return &basicCredentials{
+		username: username,
+		password: password,
+	}
+}
+
+type Option func(*RestClient)
+
 type LoginResponse struct {
 	SessionID string `json:"session_id,omitempty"`
 }
+
 type LoginClusterResponse struct {
 	LoginResponse
 	GuestClusterServer string `json:"guest_cluster_server,omitempty"`
@@ -40,8 +80,26 @@ type Namespace struct {
 	ControlPlaneDNSNames     []string `json:"control_plane_dns_names,omitempty"`
 }
 
-func New(baseUrl string) (*RestClient, error) {
-	u, err := url.Parse(baseUrl)
+func WithClient(c *http.Client) Option {
+	return func(r *RestClient) {
+		r.c = c
+	}
+}
+
+func WithInsecure(insecure bool) Option {
+	return func(rc *RestClient) {
+		rc.c.Transport.(*http.Transport).TLSClientConfig.InsecureSkipVerify = insecure
+	}
+}
+
+func WithCredentials(creds ReqInjector) Option {
+	return func(rc *RestClient) {
+		rc.cred = creds
+	}
+}
+
+func New(baseURL string) (*RestClient, error) {
+	u, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, err
 	}
@@ -61,14 +119,14 @@ func (r *RestClient) SetToken(t string) *RestClient {
 	return r
 }
 
-func (r *RestClient) Namespaces() ([]Namespace, error) {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/wcp/workloads", r.u.String()), nil)
+func (r *RestClient) Namespaces(ctx context.Context) ([]Namespace, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/wcp/workloads", r.u.String()), nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header = map[string][]string{
 		"Content-Type":  {"application/json"},
-		"Authorization": {fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", r.username, r.password))))},
+		"Authorization": {fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s:%s", r.username, r.password)))},
 	}
 	resp, err := r.c.Do(req)
 	if err != nil {
@@ -93,11 +151,11 @@ func (r *RestClient) Namespaces() ([]Namespace, error) {
 	return namespaces, nil
 }
 
-func (r *RestClient) Clusters(ns string) (*v1.Table, error) {
+func (r *RestClient) Clusters(ctx context.Context, ns string) (*v1.Table, error) {
 	if len(ns) == 0 {
 		ns = "default"
 	}
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s:6443/apis/run.tanzu.vmware.com/v1alpha2/namespaces/%s/tanzukubernetesclusters?limit=500", r.u.String(), ns), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s:6443/apis/run.tanzu.vmware.com/v1alpha2/namespaces/%s/tanzukubernetesclusters?limit=500", r.u.String(), ns), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +180,7 @@ func (r *RestClient) Clusters(ns string) (*v1.Table, error) {
 	return &clusterlist, nil
 }
 
-func (r *RestClient) ReleasesTable() (*v1.Table, error) {
+func (r *RestClient) ReleasesTable(ctx context.Context) (*v1.Table, error) {
 	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s:6443/apis/run.tanzu.vmware.com/v1alpha2/tanzukubernetesreleases?limit=500", r.u.String()), nil)
 	if err != nil {
 		return nil, err
@@ -148,8 +206,8 @@ func (r *RestClient) ReleasesTable() (*v1.Table, error) {
 	return &releases, nil
 }
 
-func (r *RestClient) AddonsTable() (*v1.Table, error) {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s:6443/apis/run.tanzu.vmware.com/v1alpha2/tanzukubernetesaddons?limit=500", r.u.String()), nil)
+func (r *RestClient) AddonsTable(ctx context.Context) (*v1.Table, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s:6443/apis/run.tanzu.vmware.com/v1alpha2/tanzukubernetesaddons?limit=500", r.u.String()), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -174,8 +232,8 @@ func (r *RestClient) AddonsTable() (*v1.Table, error) {
 	return &addons, nil
 }
 
-func (r *RestClient) Releases() (*v1alpha2.TanzuKubernetesReleaseList, error) {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s:6443/apis/run.tanzu.vmware.com/v1alpha2/tanzukubernetesreleases?limit=500", r.u.String()), nil)
+func (r *RestClient) Releases(ctx context.Context) (*v1alpha2.TanzuKubernetesReleaseList, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s:6443/apis/run.tanzu.vmware.com/v1alpha2/tanzukubernetesreleases?limit=500", r.u.String()), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -199,11 +257,11 @@ func (r *RestClient) Releases() (*v1alpha2.TanzuKubernetesReleaseList, error) {
 	return &releases, nil
 }
 
-func (r *RestClient) Cluster(ns, name string) (*v1alpha2.TanzuKubernetesCluster, error) {
+func (r *RestClient) Cluster(ctx context.Context, ns, name string) (*v1alpha2.TanzuKubernetesCluster, error) {
 	if len(ns) == 0 {
 		ns = "default"
 	}
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s:6443/apis/run.tanzu.vmware.com/v1alpha2/namespaces/%s/tanzukubernetesclusters/%s", r.u.String(), ns, name), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s:6443/apis/run.tanzu.vmware.com/v1alpha2/namespaces/%s/tanzukubernetesclusters/%s", r.u.String(), ns, name), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -227,17 +285,16 @@ func (r *RestClient) Cluster(ns, name string) (*v1alpha2.TanzuKubernetesCluster,
 	return &cluster, nil
 }
 
-func (r *RestClient) Login(u, p string) error {
-
+func (r *RestClient) Login(ctx context.Context, u, p string) error {
 	r.username = u
 	r.password = p
-	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/wcp/login", r.u.String()), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/wcp/login", r.u.String()), nil)
 	if err != nil {
 		return err
 	}
 	req.Header = map[string][]string{
 		"Content-Type":  {"application/json"},
-		"Authorization": {fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", u, p))))},
+		"Authorization": {fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s:%s", u, p)))},
 	}
 	resp, err := r.c.Do(req)
 	if err != nil {
@@ -257,18 +314,18 @@ func (r *RestClient) Login(u, p string) error {
 	return nil
 }
 
-func (r *RestClient) LoginCluster(cluster, namespace string) (*LoginClusterResponse, error) {
+func (r *RestClient) LoginCluster(ctx context.Context, cluster, namespace string) (*LoginClusterResponse, error) {
 	data := fmt.Sprintf("{\"guest_cluster_name\":\"%s\"}", cluster)
 	if len(namespace) > 0 {
 		data = fmt.Sprintf("{\"guest_cluster_name\":\"%s\", \"guest_cluster_namespace\":\"%s\"}", cluster, namespace)
 	}
-	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/wcp/login", r.u.String()), bytes.NewBuffer([]byte(data)))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/wcp/login", r.u.String()), bytes.NewBuffer([]byte(data)))
 	if err != nil {
 		return nil, err
 	}
 	req.Header = map[string][]string{
 		"Content-Type":  {"application/json"},
-		"Authorization": {fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", r.username, r.password))))},
+		"Authorization": {fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s:%s", r.username, r.password)))},
 	}
 	resp, err := r.c.Do(req)
 	if err != nil {
@@ -284,6 +341,11 @@ func (r *RestClient) LoginCluster(cluster, namespace string) (*LoginClusterRespo
 	if err != nil {
 		return nil, err
 	}
+
+	// An 'guest_cluster_server' in response means a not-found error
+	if len(login.GuestClusterServer) == 0 {
+		return nil, ErrClusterNotFound
+	}
 	return &login, nil
 }
 
@@ -292,7 +354,11 @@ func handleResponse(resp *http.Response) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
 	statusOK := resp.StatusCode >= 200 && resp.StatusCode < 300
 	if !statusOK {
 		return nil, errors.New(string(body))

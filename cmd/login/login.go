@@ -1,7 +1,9 @@
 package login
 
 import (
+	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/url"
 	"syscall"
@@ -23,7 +25,7 @@ var (
 func NewCmdLogin() *cobra.Command {
 	c := &cobra.Command{
 		Use: "login CLUSTER",
-		//Args:  cobra.MaximumNArgs(1),
+		// Args:  cobra.MaximumNArgs(1),
 		Args:  cobra.MinimumNArgs(0),
 		Short: "Authenticate user with Tanzu namespaces and clusters",
 		Long: `Authenticate user with Tanzu namespaces and clusters
@@ -52,6 +54,7 @@ Examples:
 			if err := viper.BindPFlags(cmd.Flags()); err != nil {
 				return err
 			}
+
 			// Read from stdin if password isn't set anywhere
 			if len(viper.GetString("password")) == 0 {
 				fmt.Printf("Password:")
@@ -68,6 +71,8 @@ Examples:
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) (err error) {
+			ctx, cancel := context.WithTimeout(context.Background(), viper.GetDuration("timeout"))
+			defer cancel()
 
 			tanzuServer := viper.GetString("server")
 			tanzuUsername := viper.GetString("username")
@@ -86,12 +91,12 @@ Examples:
 				return err
 			}
 			c.SetInsecure(insecureSkipVerify)
-			err = c.Login(tanzuUsername, tanzuPassword)
+			err = c.Login(ctx, tanzuUsername, tanzuPassword)
 			if err != nil {
 				return err
 			}
 
-			ns, err := c.Namespaces()
+			ns, err := c.Namespaces(ctx)
 			if err != nil {
 				return err
 			}
@@ -138,8 +143,12 @@ Examples:
 			// Range over args and perform login on each of them
 			for _, arg := range args {
 				tanzuCluster := arg
-				res, err := c.LoginCluster(tanzuCluster, tanzuNamespace)
+				res, err := c.LoginCluster(ctx, tanzuCluster, tanzuNamespace)
 				if err != nil {
+					if errors.Is(err, client.ErrClusterNotFound) {
+						fmt.Printf("Cluster %s does not exist", tanzuCluster)
+						continue
+					}
 					return err
 				}
 				caCertData, err := base64.StdEncoding.DecodeString(res.GuestClusterCa)
@@ -178,6 +187,7 @@ Examples:
 					return err
 				}
 
+				fmt.Printf("Successfully logged into cluster %s", tanzuCluster)
 			}
 
 			return nil
