@@ -90,8 +90,8 @@ Examples:
 			if _, ok := conf.AuthInfos[authName]; !ok {
 				return errors.New("credentials missing! Please run 'tcli login' to authenticate")
 			}
-			c.SetToken(conf.AuthInfos[authName].Token)
-			c.SetInsecure(insecureSkipVerify)
+			c.(*client.RestClient).SetToken(conf.AuthInfos[authName].Token)
+			c.(*client.RestClient).SetInsecure(insecureSkipVerify)
 
 			// Check if there is a namespace set in the context that we can use so that we don't have to specify the --namespace flag
 			if _, ok := conf.Contexts[contextName]; ok && len(tanzuNamespace) == 0 {
@@ -127,7 +127,7 @@ Examples:
 	return c
 }
 
-func listClusters(ctx context.Context, c *client.RestClient, ns string) error {
+func listClusters(ctx context.Context, c client.Client, ns string) error {
 	objs, err := c.Clusters(ctx, ns)
 	if err != nil {
 		return err
@@ -140,7 +140,7 @@ func listClusters(ctx context.Context, c *client.RestClient, ns string) error {
 	return nil
 }
 
-func listReleases(ctx context.Context, c *client.RestClient) error {
+func listReleases(ctx context.Context, c client.Client) error {
 	objs, err := c.ReleasesTable(ctx)
 	if err != nil {
 		return err
@@ -153,7 +153,7 @@ func listReleases(ctx context.Context, c *client.RestClient) error {
 	return nil
 }
 
-func listNamespaces(ctx context.Context, c *client.RestClient, username, password string) error {
+func listNamespaces(ctx context.Context, c client.Client, username, password string) error {
 	err := c.Login(ctx, username, password)
 	if err != nil {
 		return err
@@ -168,7 +168,7 @@ func listNamespaces(ctx context.Context, c *client.RestClient, username, passwor
 	return nil
 }
 
-func listAddons(ctx context.Context, c *client.RestClient) error {
+func listAddons(ctx context.Context, c client.Client) error {
 	objs, err := c.AddonsTable(ctx)
 	if err != nil {
 		return err

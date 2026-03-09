@@ -78,8 +78,8 @@ Examples:
 			if _, ok := conf.AuthInfos[authName]; !ok {
 				return errors.New("credentials missing! Please run 'tcli login' to authenticate")
 			}
-			c.SetToken(conf.AuthInfos[authName].Token)
-			c.SetInsecure(insecureSkipVerify)
+			c.(*client.RestClient).SetToken(conf.AuthInfos[authName].Token)
+			c.(*client.RestClient).SetInsecure(insecureSkipVerify)
 
 			// Check if there is a namespace set in the context that we can use so that we don't have to specify the --namespace flag
 			if _, ok := conf.Contexts[contextName]; ok && len(tanzuNamespace) == 0 {
