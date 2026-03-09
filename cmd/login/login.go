@@ -90,7 +90,7 @@ Examples:
 			if err != nil {
 				return err
 			}
-			c.SetInsecure(insecureSkipVerify)
+			c.(*client.RestClient).SetInsecure(insecureSkipVerify)
 			err = c.Login(ctx, tanzuUsername, tanzuPassword)
 			if err != nil {
 				return err
@@ -108,7 +108,7 @@ Examples:
 
 			authName := fmt.Sprintf("wcp:%s:%s", u.Host, tanzuUsername)
 			auth := api.NewAuthInfo()
-			auth.Token = c.Token
+			auth.Token = c.(*client.RestClient).Token
 
 			context := api.NewContext()
 			context.Cluster = u.Host
