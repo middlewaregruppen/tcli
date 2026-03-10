@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,7 +40,6 @@ type RestClient struct {
 
 type Credentials interface {
 	Apply(*http.Request) error
-	Raw() []byte
 }
 
 type basicCredentials struct {
@@ -54,16 +52,7 @@ func (c *basicCredentials) Apply(r *http.Request) error {
 	return nil
 }
 
-func (c *basicCredentials) Raw() []byte {
-	return []byte(base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s:%s", c.username, c.password)))
-}
-
 type tokenCredentials string
-
-// Raw implements [Credentials].
-func (c *tokenCredentials) Raw() []byte {
-	return []byte(*c)
-}
 
 func (c *tokenCredentials) Apply(r *http.Request) error {
 	r.Header.Add("Authorization", fmt.Sprintf("Bearer %v", *c))
