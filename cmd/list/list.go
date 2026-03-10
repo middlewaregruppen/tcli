@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"strings"
@@ -68,12 +69,6 @@ Examples:
 				return err
 			}
 
-			// Create rest client
-			c, err := client.New(tanzuServer)
-			if err != nil {
-				return err
-			}
-
 			// Find credentials from kubeconfig context
 			contextName := u.Host
 			if _, ok := conf.Contexts[contextName]; !ok {
@@ -90,10 +85,16 @@ Examples:
 			if _, ok := conf.AuthInfos[authName]; !ok {
 				return errors.New("credentials missing! Please run 'tcli login' to authenticate")
 			}
-			c.(*client.RestClient).SetToken(conf.AuthInfos[authName].Token)
-			c.(*client.RestClient).SetInsecure(insecureSkipVerify)
 
-			// Check if there is a namespace set in the context that we can use so that we don't have to specify the --namespace flag
+			token := conf.AuthInfos[authName].Token
+
+			// Create rest client
+			logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+			c, err := client.New(tanzuServer, client.WithLogger(logger), client.WithCredentials(client.TokenCredentials(token)), client.WithInsecure(insecureSkipVerify))
+			if err != nil {
+				return err
+			}
+
 			if _, ok := conf.Contexts[contextName]; ok && len(tanzuNamespace) == 0 {
 				tanzuNamespace = conf.Contexts[contextName].Namespace
 			}
@@ -111,7 +112,7 @@ Examples:
 					tanzuPassword = string(bytePassword)
 					fmt.Printf("\n")
 				}
-				return listNamespaces(ctx, c, tanzuUsername, tanzuPassword)
+				return listNamespaces(ctx, tanzuServer, tanzuUsername, tanzuPassword, insecureSkipVerify)
 			case "clusters", "clu", "tkc":
 				return listClusters(ctx, c, tanzuNamespace)
 			case "releases", "rel", "tkr":
@@ -153,11 +154,12 @@ func listReleases(ctx context.Context, c client.Client) error {
 	return nil
 }
 
-func listNamespaces(ctx context.Context, c client.Client, username, password string) error {
-	err := c.Login(ctx, username, password)
+func listNamespaces(ctx context.Context, server, username, password string, insecure bool) error {
+	c, err := client.New(server, client.WithCredentials(client.BasicCredentials(username, password)), client.WithInsecure(insecure))
 	if err != nil {
 		return err
 	}
+
 	nsList, err := c.Namespaces(ctx)
 	if err != nil {
 		return err
