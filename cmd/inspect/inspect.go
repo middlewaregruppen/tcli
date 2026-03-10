@@ -3,17 +3,13 @@ package inspect
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
-	"log/slog"
-	"net/url"
 	"os"
 
-	"github.com/middlewaregruppen/tcli/pkg/client"
+	"github.com/middlewaregruppen/tcli/cmd/internal/auth"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 var tanzuNamespace string
@@ -31,12 +27,9 @@ Examples:
 	Use "tcli --help" for a list of global command-line options (applies to all commands).
 	`,
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := viper.BindPFlags(cmd.Flags()); err != nil {
-				return err
-			}
-			return nil
+			return viper.BindPFlags(cmd.Flags())
 		},
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), viper.GetDuration("timeout"))
 			defer cancel()
 
@@ -46,46 +39,14 @@ Examples:
 			insecureSkipVerify := viper.GetBool("insecure")
 			kubeconfig := viper.GetString("kubeconfig")
 
-			u, err := url.Parse(tanzuServer)
+			c, contextNamespace, err := auth.ClientFromKubeconfig(tanzuServer, kubeconfig, tanzuUsername, insecureSkipVerify)
 			if err != nil {
 				return err
 			}
 
-			// Read kubeconfig from file
-			conf, err := clientcmd.LoadFromFile(kubeconfig)
-			if err != nil {
-				return err
-			}
-
-			// Find credentials from kubeconfig context
-			contextName := u.Host
-			if _, ok := conf.Contexts[contextName]; !ok {
-				return errors.New("credentials missing! Please run 'tcli login' to authenticate")
-			}
-
-			// AuthInfo name is whatever is set in the context. However it can be overriden with the --username flag
-			authName := fmt.Sprintf("wcp:%s:%s", u.Host, conf.Contexts[contextName].AuthInfo)
-			if len(tanzuUsername) > 0 {
-				authName = fmt.Sprintf("wcp:%s:%s", u.Host, tanzuUsername)
-			}
-
-			// Check if the AuthInfo object exists
-			if _, ok := conf.AuthInfos[authName]; !ok {
-				return errors.New("credentials missing! Please run 'tcli login' to authenticate")
-			}
-
-			// Check if there is a namespace set in the context that we can use so that we don't have to specify the --namespace flag
-			if _, ok := conf.Contexts[contextName]; ok && len(tanzuNamespace) == 0 {
-				tanzuNamespace = conf.Contexts[contextName].Namespace
-			}
-
-			token := conf.AuthInfos[authName].Token
-
-			// Create rest client
-			logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
-			c, err := client.New(tanzuServer, client.WithLogger(logger), client.WithCredentials(client.TokenCredentials(token)), client.WithInsecure(insecureSkipVerify))
-			if err != nil {
-				return err
+			// If --namespace was not given, fall back to the namespace stored in the kubeconfig context
+			if len(tanzuNamespace) == 0 {
+				tanzuNamespace = contextNamespace
 			}
 
 			cluster, err := c.Cluster(ctx, tanzuNamespace, tanzuCluster)
@@ -96,13 +57,11 @@ Examples:
 			buf := bytes.Buffer{}
 			yamlEncoder := yaml.NewEncoder(&buf)
 			yamlEncoder.SetIndent(2)
-			err = yamlEncoder.Encode(cluster)
-			if err != nil {
-				return err
+			if err := yamlEncoder.Encode(cluster); err != nil {
+				return fmt.Errorf("encoding cluster as YAML: %w", err)
 			}
-			_, err = buf.WriteTo(os.Stdout)
-			if err != nil {
-				return err
+			if _, err := buf.WriteTo(os.Stdout); err != nil {
+				return fmt.Errorf("writing output: %w", err)
 			}
 			return nil
 		},

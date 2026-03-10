@@ -1,14 +1,12 @@
 package use
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
 	"k8s.io/client-go/tools/clientcmd"
-)
-
-var (
-	tanzuNamespace string
 )
 
 func NewCmdUse() *cobra.Command {
@@ -23,37 +21,30 @@ Examples:
 
 	Use "tcli --help" for a list of global command-line options (applies to all commands).
 	`,
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			if err := viper.BindPFlags(cmd.Flags()); err != nil {
-				return err
-			}
-			return nil
-		},
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
-
+		RunE: func(cmd *cobra.Command, args []string) error {
 			kubeconfig := viper.GetString("kubeconfig")
+			namespace := args[0]
 
 			// Read kubeconfig from file
 			conf, err := clientcmd.LoadFromFile(kubeconfig)
 			if err != nil {
-				return err
+				return fmt.Errorf("loading kubeconfig: %w", err)
 			}
 
 			// Update namespace in current context
 			currentCtx := conf.CurrentContext
 			if _, ok := conf.Contexts[currentCtx]; ok {
-				conf.Contexts[currentCtx].Namespace = args[0]
+				conf.Contexts[currentCtx].Namespace = namespace
 			}
 
 			// Write back to kubeconfig
-			err = clientcmd.WriteToFile(*conf, kubeconfig)
-			if err != nil {
-				return err
+			if err := clientcmd.WriteToFile(*conf, kubeconfig); err != nil {
+				return fmt.Errorf("writing kubeconfig: %w", err)
 			}
 
+			fmt.Printf("Namespace set to %q in context %q\n", namespace, currentCtx)
 			return nil
 		},
 	}
-	c.Flags().StringVarP(&tanzuNamespace, "namespace", "n", "", "Namespace to use")
 	return c
 }

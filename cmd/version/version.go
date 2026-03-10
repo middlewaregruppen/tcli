@@ -24,11 +24,13 @@ func NewCmdVersion() *cobra.Command {
 		Use:     "version",
 		Short:   "Prints the tcli version",
 		Example: `tcli version`,
-		Run: func(_ *cobra.Command, _ []string) {
-			fmt.Printf("Version: %s%v%s\t\n", colorGreen, VERSION, colorReset)
-			fmt.Printf("Built: %v\t\n", DATE)
-			fmt.Printf("Commit: %v\t\n", COMMIT)
-			fmt.Printf("Branch: %v\t\n", BRANCH)
+		RunE: func(_ *cobra.Command, _ []string) error {
+			fmt.Printf("Version:   %s%v%s\n", colorGreen, VERSION, colorReset)
+			fmt.Printf("Built:     %v\n", DATE)
+			fmt.Printf("Commit:    %v\n", COMMIT)
+			fmt.Printf("Branch:    %v\n", BRANCH)
+			fmt.Printf("Go:        %v\n", GOVERSION)
+			return nil
 		},
 	}
 	return versionCmd

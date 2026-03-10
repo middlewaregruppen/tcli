@@ -11,7 +11,6 @@ import (
 	"syscall"
 
 	"github.com/middlewaregruppen/tcli/pkg/client"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/term"
@@ -27,8 +26,7 @@ var (
 
 func NewCmdLogin() *cobra.Command {
 	c := &cobra.Command{
-		Use: "login CLUSTER",
-		// Args:  cobra.MaximumNArgs(1),
+		Use:   "login [CLUSTER...]",
 		Args:  cobra.MinimumNArgs(0),
 		Short: "Authenticate user with Tanzu namespaces and clusters",
 		Long: `Authenticate user with Tanzu namespaces and clusters
@@ -48,7 +46,7 @@ Examples:
 	# Login to multiple tanzu clusters in one go
 	tcli login CLUSTER1 CLUSTER2 CLUSTER3 ...
 
-	# Login to a tanzu clusters in the same namespace
+	# Login to tanzu clusters in the same namespace
 	tcli login CLUSTER1 CLUSTER2 -n NAMESPACE
 
 	Use "tcli --help" for a list of global command-line options (applies to all commands).
@@ -58,22 +56,21 @@ Examples:
 				return err
 			}
 
-			// Read from stdin if password isn't set anywhere
+			// Prompt for password on stdin if it wasn't provided via flag or env
 			if len(viper.GetString("password")) == 0 {
 				fmt.Printf("Password:")
 				bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 				if err != nil {
 					return err
 				}
-				err = cmd.Flags().Set("password", string(bytePassword))
-				if err != nil {
+				if err := cmd.Flags().Set("password", string(bytePassword)); err != nil {
 					return err
 				}
 				fmt.Printf("\n")
 			}
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, cancel := context.WithTimeout(context.Background(), viper.GetDuration("timeout"))
 			defer cancel()
 
@@ -86,58 +83,61 @@ Examples:
 
 			u, err := url.Parse(tanzuServer)
 			if err != nil {
-				return err
+				return fmt.Errorf("parsing server URL: %w", err)
 			}
 
+			// Supervisor server speaks the WCP API on port 443, but the
+			// kubeconfig cluster entry uses the k8s API on port 6443. Build
+			// the k8s API URL from the already-parsed host to avoid doubling
+			// the port if the user supplied tanzuServer with an explicit port.
+			supervisorK8sServer := fmt.Sprintf("https://%s:6443", u.Hostname())
+
 			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-			c, err := client.New(tanzuServer, client.WithLogger(logger), client.WithCredentials(client.BasicCredentials(tanzuUsername, tanzuPassword)))
+			c, err := client.New(
+				tanzuServer,
+				client.WithLogger(logger),
+				client.WithCredentials(client.BasicCredentials(tanzuUsername, tanzuPassword)),
+				client.WithInsecure(insecureSkipVerify),
+			)
 			if err != nil {
 				return err
 			}
-			c.(*client.RestClient).SetInsecure(insecureSkipVerify)
+
 			sess, err := c.Login(ctx, tanzuUsername, tanzuPassword)
 			if err != nil {
 				return err
 			}
-
-			logrus.Debug("successfully logged in to cluster")
 
 			ns, err := c.Namespaces(ctx)
 			if err != nil {
 				return err
 			}
 
-			// Define the new cluster to which we have logged in to
-			cluster := api.NewCluster()
-			cluster.InsecureSkipTLSVerify = true
-			cluster.Server = fmt.Sprintf("%s:6443", tanzuServer)
+			// Build the supervisor cluster entry for kubeconfig
+			supervisorCluster := api.NewCluster()
+			supervisorCluster.InsecureSkipTLSVerify = insecureSkipVerify
+			supervisorCluster.Server = supervisorK8sServer
 
 			authName := fmt.Sprintf("wcp:%s:%s", u.Host, tanzuUsername)
 			auth := api.NewAuthInfo()
 			auth.Token = sess.SessionID
 
-			context := api.NewContext()
-			context.Cluster = u.Host
-			context.AuthInfo = authName
+			kubectx := api.NewContext()
+			kubectx.Cluster = u.Host
+			kubectx.AuthInfo = authName
 			if len(ns) > 0 {
-				context.Namespace = ns[len(ns)-1].Namespace
+				kubectx.Namespace = ns[len(ns)-1].Namespace
 			}
 
-			// Read kubeconfig from file
+			// Load kubeconfig once; update in memory, write once at the end
 			conf, err := clientcmd.LoadFromFile(kubeconfig)
 			if err != nil {
-				return err
+				return fmt.Errorf("loading kubeconfig: %w", err)
 			}
-			conf.Clusters[u.Host] = cluster
+			conf.Clusters[u.Host] = supervisorCluster
 			conf.AuthInfos[authName] = auth
-			conf.Contexts[u.Host] = context
+			conf.Contexts[u.Host] = kubectx
 			conf.CurrentContext = u.Host
-
-			// Write back to kubeconfig
-			err = clientcmd.WriteToFile(*conf, kubeconfig)
-			if err != nil {
-				return err
-			}
 
 			if !silent {
 				fmt.Printf("You have access to following %d namespaces:\n", len(ns))
@@ -146,60 +146,57 @@ Examples:
 				}
 			}
 
-			// Range over args and perform login on each of them
-			for _, arg := range args {
-				tanzuCluster := arg
+			// Login to each requested workload cluster, updating conf in memory
+			for _, tanzuCluster := range args {
 				res, err := c.LoginCluster(ctx, tanzuCluster, tanzuNamespace)
 				if err != nil {
 					if errors.Is(err, client.ErrClusterNotFound) {
-						fmt.Printf("Cluster %s does not exist", tanzuCluster)
-						continue
+						return fmt.Errorf("cluster %q not found", tanzuCluster)
 					}
 					return err
 				}
+
 				caCertData, err := base64.StdEncoding.DecodeString(res.GuestClusterCa)
 				if err != nil {
-					return err
-				}
-				cluster := api.NewCluster()
-				cluster.CertificateAuthorityData = caCertData
-				cluster.Server = fmt.Sprintf("https://%s:6443", res.GuestClusterServer)
-				authName := fmt.Sprintf("wcp:%s:%s", res.GuestClusterServer, tanzuUsername)
-				auth := api.NewAuthInfo()
-				auth.Token = res.SessionID
-				context := api.NewContext()
-				context.Cluster = res.GuestClusterServer
-				context.AuthInfo = authName
-
-				conf, err := clientcmd.LoadFromFile(kubeconfig)
-				if err != nil {
-					return err
+					return fmt.Errorf("decoding CA cert for cluster %q: %w", tanzuCluster, err)
 				}
 
-				// Update namespace field in context for supervisor server.
-				// This allows us to run commands that require the --namespace flag without having to providing the flag
+				wlCluster := api.NewCluster()
+				wlCluster.CertificateAuthorityData = caCertData
+				wlCluster.Server = fmt.Sprintf("https://%s:6443", res.GuestClusterServer)
+
+				wlAuthName := fmt.Sprintf("wcp:%s:%s", res.GuestClusterServer, tanzuUsername)
+				wlAuth := api.NewAuthInfo()
+				wlAuth.Token = res.SessionID
+
+				wlCtx := api.NewContext()
+				wlCtx.Cluster = res.GuestClusterServer
+				wlCtx.AuthInfo = wlAuthName
+
+				// Propagate the namespace into the supervisor context so that
+				// subsequent commands that read --namespace from kubeconfig work
+				// without requiring the flag explicitly.
 				if _, ok := conf.Contexts[u.Host]; ok {
 					conf.Contexts[u.Host].Namespace = tanzuNamespace
 				}
 
-				conf.Clusters[res.GuestClusterServer] = cluster
-				conf.AuthInfos[authName] = auth
-				conf.Contexts[tanzuCluster] = context
+				conf.Clusters[res.GuestClusterServer] = wlCluster
+				conf.AuthInfos[wlAuthName] = wlAuth
+				conf.Contexts[tanzuCluster] = wlCtx
 				conf.CurrentContext = tanzuCluster
 
-				// Write back to kubeconfig
-				err = clientcmd.WriteToFile(*conf, kubeconfig)
-				if err != nil {
-					return err
-				}
+				fmt.Printf("Successfully logged into cluster %s\n", tanzuCluster)
+			}
 
-				fmt.Printf("Successfully logged into cluster %s", tanzuCluster)
+			// Single write after all in-memory updates are done
+			if err := clientcmd.WriteToFile(*conf, kubeconfig); err != nil {
+				return fmt.Errorf("writing kubeconfig: %w", err)
 			}
 
 			return nil
 		},
 	}
 	c.Flags().StringVarP(&tanzuNamespace, "namespace", "n", "", "Namespace in which the Tanzu Kubernetes cluster resides.")
-	c.Flags().BoolVar(&silent, "silent", false, "Silent mode - supress output")
+	c.Flags().BoolVar(&silent, "silent", false, "Silent mode - suppress output")
 	return c
 }
