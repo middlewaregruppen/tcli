@@ -5,10 +5,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
+	"os"
 	"syscall"
 
 	"github.com/middlewaregruppen/tcli/pkg/client"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/term"
@@ -86,15 +89,18 @@ Examples:
 				return err
 			}
 
-			c, err := client.New(tanzuServer)
+			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+			c, err := client.New(tanzuServer, client.WithLogger(logger), client.WithCredentials(client.BasicCredentials(tanzuUsername, tanzuPassword)))
 			if err != nil {
 				return err
 			}
 			c.(*client.RestClient).SetInsecure(insecureSkipVerify)
-			err = c.Login(ctx, tanzuUsername, tanzuPassword)
+			sess, err := c.Login(ctx, tanzuUsername, tanzuPassword)
 			if err != nil {
 				return err
 			}
+
+			logrus.Debug("successfully logged in to cluster")
 
 			ns, err := c.Namespaces(ctx)
 			if err != nil {
@@ -108,7 +114,7 @@ Examples:
 
 			authName := fmt.Sprintf("wcp:%s:%s", u.Host, tanzuUsername)
 			auth := api.NewAuthInfo()
-			auth.Token = c.(*client.RestClient).Token
+			auth.Token = sess.SessionID
 
 			context := api.NewContext()
 			context.Cluster = u.Host

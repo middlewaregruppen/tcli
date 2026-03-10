@@ -14,6 +14,6 @@ type Client interface {
 	Releases(ctx context.Context) (*v1alpha2.TanzuKubernetesReleaseList, error)
 	Cluster(ctx context.Context, ns, name string) (*v1alpha2.TanzuKubernetesCluster, error)
 	Clusters(ctx context.Context, ns string) (*v1.Table, error)
-	Login(ctx context.Context, u, p string) error
+	Login(ctx context.Context, u, p string) (*LoginResponse, error)
 	LoginCluster(ctx context.Context, cluster, namespace string) (*LoginClusterResponse, error)
 }

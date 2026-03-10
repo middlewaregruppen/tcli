@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 
@@ -56,12 +57,6 @@ Examples:
 				return err
 			}
 
-			// Create rest client
-			c, err := client.New(tanzuServer)
-			if err != nil {
-				return err
-			}
-
 			// Find credentials from kubeconfig context
 			contextName := u.Host
 			if _, ok := conf.Contexts[contextName]; !ok {
@@ -78,12 +73,19 @@ Examples:
 			if _, ok := conf.AuthInfos[authName]; !ok {
 				return errors.New("credentials missing! Please run 'tcli login' to authenticate")
 			}
-			c.(*client.RestClient).SetToken(conf.AuthInfos[authName].Token)
-			c.(*client.RestClient).SetInsecure(insecureSkipVerify)
 
 			// Check if there is a namespace set in the context that we can use so that we don't have to specify the --namespace flag
 			if _, ok := conf.Contexts[contextName]; ok && len(tanzuNamespace) == 0 {
 				tanzuNamespace = conf.Contexts[contextName].Namespace
+			}
+
+			token := conf.AuthInfos[authName].Token
+
+			// Create rest client
+			logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+			c, err := client.New(tanzuServer, client.WithLogger(logger), client.WithCredentials(client.TokenCredentials(token)), client.WithInsecure(insecureSkipVerify))
+			if err != nil {
+				return err
 			}
 
 			cluster, err := c.Cluster(ctx, tanzuNamespace, tanzuCluster)

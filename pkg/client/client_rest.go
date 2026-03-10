@@ -9,9 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"sort"
+	"time"
 
 	"github.com/vmware-tanzu/tanzu-framework/apis/run/v1alpha2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,14 +34,17 @@ var (
 type RestClient struct {
 	uri        *url.URL
 	httpClient *http.Client
-	cred       ReqInjector
+	auth       Credentials
 	username   string
 	password   string
 	Token      string
+	opts       []Option
+	logger     *slog.Logger
 }
 
-type ReqInjector interface {
-	Inject(*http.Request) error
+type Credentials interface {
+	Apply(*http.Request) error
+	Raw() []byte
 }
 
 type basicCredentials struct {
@@ -47,24 +52,33 @@ type basicCredentials struct {
 	password string
 }
 
-func (c *basicCredentials) Inject(r *http.Request) error {
-	r.Header.Add("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s:%s", c.username, c.password))))
+func (c *basicCredentials) Apply(r *http.Request) error {
+	r.SetBasicAuth(c.username, c.password)
 	return nil
+}
+
+func (c *basicCredentials) Raw() []byte {
+	return []byte(base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s:%s", c.username, c.password)))
 }
 
 type tokenCredentials string
 
-func (c *tokenCredentials) Inject(r *http.Request) error {
-	r.Header.Add("Authorization", fmt.Sprintf("Bearer %v", c))
+// Raw implements [Credentials].
+func (c *tokenCredentials) Raw() []byte {
+	return []byte(*c)
+}
+
+func (c *tokenCredentials) Apply(r *http.Request) error {
+	r.Header.Add("Authorization", fmt.Sprintf("Bearer %v", *c))
 	return nil
 }
 
-func TokenCredentials(token string) ReqInjector {
+func TokenCredentials(token string) Credentials {
 	t := tokenCredentials(token)
 	return &t
 }
 
-func BasicCredentials(username, password string) ReqInjector {
+func BasicCredentials(username, password string) Credentials {
 	return &basicCredentials{
 		username: username,
 		password: password,
@@ -98,13 +112,33 @@ func WithClient(c *http.Client) Option {
 
 func WithInsecure(insecure bool) Option {
 	return func(rc *RestClient) {
-		rc.httpClient.Transport.(*http.Transport).TLSClientConfig.InsecureSkipVerify = insecure
+		if rc.httpClient == nil {
+			rc.httpClient = &http.Client{}
+		}
+
+		baseTransport := rc.httpClient.Transport
+		if baseTransport == nil {
+			baseTransport = http.DefaultTransport
+		}
+
+		transport := baseTransport.(*http.Transport).Clone()
+		if transport.TLSClientConfig == nil {
+			transport.TLSClientConfig = &tls.Config{}
+		}
+		transport.TLSClientConfig.InsecureSkipVerify = insecure
+		rc.httpClient.Transport = transport
 	}
 }
 
-func WithCredentials(creds ReqInjector) Option {
+func WithCredentials(creds Credentials) Option {
 	return func(rc *RestClient) {
-		rc.cred = creds
+		rc.auth = creds
+	}
+}
+
+func WithLogger(l *slog.Logger) Option {
+	return func(rc *RestClient) {
+		rc.logger = l
 	}
 }
 
@@ -118,6 +152,45 @@ func (r *RestClient) SetToken(t string) *RestClient {
 	return r
 }
 
+// DoRequest applies options and then performs the http request
+func (r *RestClient) DoRequest(req *http.Request) (*http.Response, error) {
+	if r.auth != nil {
+		if err := r.auth.Apply(req); err != nil {
+			r.logger.Debug("error applying credentials to request",
+				"method", req.Method,
+				"url", req.URL.String(),
+				"auth_method", &r.auth,
+				"error", err,
+			)
+			return nil, err
+		}
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	start := time.Now()
+
+	res, err := r.httpClient.Do(req)
+	if err != nil {
+		r.logger.Debug("http request failed",
+			"method", req.Method,
+			"url", req.URL.String(),
+			"duration", time.Since(start),
+			"error", err,
+		)
+		return nil, err
+	}
+
+	r.logger.Debug("http request executed",
+		"method", req.Method,
+		"url", req.URL.String(),
+		"duration", time.Since(start),
+		"error", err,
+		"res_content_type", res.Header.Values("Content-Type"),
+		"req_content_type", req.Header.Values("Content-Type"),
+	)
+	return res, nil
+}
+
 // getRequestURI builds an URI for the given path. It uses the base URI when RestClient was created with [New]
 func (r *RestClient) getRequestURI(path string) (*url.URL, error) {
 	newPath, err := url.JoinPath(r.uri.Path, path)
@@ -126,6 +199,10 @@ func (r *RestClient) getRequestURI(path string) (*url.URL, error) {
 	}
 	newURL := *r.uri
 	newURL.Path = newPath
+	r.logger.Debug("built request uri",
+		"path", path,
+		"uri", newURL.String(),
+	)
 	return &newURL, nil
 }
 
@@ -139,15 +216,13 @@ func (r *RestClient) Namespaces(ctx context.Context) ([]Namespace, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header = map[string][]string{
-		"Content-Type":  {"application/json"},
-		"Authorization": {fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s:%s", r.username, r.password)))},
-	}
-	resp, err := r.httpClient.Do(req)
+
+	resp, err := r.DoRequest(req)
 	if err != nil {
 		return nil, err
 	}
-	body, err := handleResponse(resp)
+
+	body, err := r.handleResponse(resp)
 	if err != nil {
 		return nil, err
 	}
@@ -171,33 +246,34 @@ func (r *RestClient) Clusters(ctx context.Context, ns string) (*v1.Table, error)
 		ns = "default"
 	}
 
-	u, err := r.getRequestURI(PathTanzuKubernetesClusters)
+	u, err := r.getRequestURI(fmt.Sprintf(PathTanzuKubernetesClusters, ns))
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf(u.String(), ns), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header = map[string][]string{
-		"Content-Type":  {"application/json"},
-		"Accept":        {"application/json;as=Table;g=meta.k8s.io;v=v1"},
-		"Authorization": {fmt.Sprintf("Bearer %s", r.Token)},
-	}
-	resp, err := r.httpClient.Do(req)
+
+	req.Header.Add("Accept", "application/json;as=Table;g=meta.k8s.io;v=v1")
+
+	resp, err := r.DoRequest(req)
 	if err != nil {
 		return nil, err
 	}
-	body, err := handleResponse(resp)
+
+	body, err := r.handleResponse(resp)
 	if err != nil {
 		return nil, err
 	}
+
 	var clusterlist v1.Table
 	err = json.Unmarshal(body, &clusterlist)
 	if err != nil {
 		return nil, err
 	}
+
 	return &clusterlist, nil
 }
 
@@ -206,28 +282,30 @@ func (r *RestClient) ReleasesTable(ctx context.Context) (*v1.Table, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header = map[string][]string{
-		"Content-Type":  {"application/json"},
-		"Accept":        {"application/json;as=Table;g=meta.k8s.io;v=v1"},
-		"Authorization": {fmt.Sprintf("Bearer %s", r.Token)},
-	}
-	resp, err := r.httpClient.Do(req)
+
+	req.Header.Add("Accept", "application/json;as=Table;g=meta.k8s.io;v=v1")
+
+	resp, err := r.DoRequest(req)
 	if err != nil {
 		return nil, err
 	}
-	body, err := handleResponse(resp)
+
+	body, err := r.handleResponse(resp)
 	if err != nil {
 		return nil, err
 	}
+
 	var releases v1.Table
 	err = json.Unmarshal(body, &releases)
 	if err != nil {
 		return nil, err
 	}
+
 	return &releases, nil
 }
 
@@ -236,28 +314,30 @@ func (r *RestClient) AddonsTable(ctx context.Context) (*v1.Table, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header = map[string][]string{
-		"Content-Type":  {"application/json"},
-		"Accept":        {"application/json;as=Table;g=meta.k8s.io;v=v1"},
-		"Authorization": {fmt.Sprintf("Bearer %s", r.Token)},
-	}
-	resp, err := r.httpClient.Do(req)
+
+	req.Header.Add("Accept", "application/json;as=Table;g=meta.k8s.io;v=v1")
+
+	resp, err := r.DoRequest(req)
 	if err != nil {
 		return nil, err
 	}
-	body, err := handleResponse(resp)
+
+	body, err := r.handleResponse(resp)
 	if err != nil {
 		return nil, err
 	}
+
 	var addons v1.Table
 	err = json.Unmarshal(body, &addons)
 	if err != nil {
 		return nil, err
 	}
+
 	return &addons, nil
 }
 
@@ -271,91 +351,85 @@ func (r *RestClient) Releases(ctx context.Context) (*v1alpha2.TanzuKubernetesRel
 	if err != nil {
 		return nil, err
 	}
-	req.Header = map[string][]string{
-		"Content-Type":  {"application/json"},
-		"Authorization": {fmt.Sprintf("Bearer %s", r.Token)},
-	}
-	resp, err := r.httpClient.Do(req)
+
+	req.Header.Add("Accept", "application/json;as=Table;g=meta.k8s.io;v=v1")
+
+	resp, err := r.DoRequest(req)
 	if err != nil {
 		return nil, err
 	}
-	body, err := handleResponse(resp)
+
+	body, err := r.handleResponse(resp)
 	if err != nil {
 		return nil, err
 	}
+
 	var releases v1alpha2.TanzuKubernetesReleaseList
 	err = json.Unmarshal(body, &releases)
 	if err != nil {
 		return nil, err
 	}
+
 	return &releases, nil
 }
 
 func (r *RestClient) Cluster(ctx context.Context, ns, name string) (*v1alpha2.TanzuKubernetesCluster, error) {
-	if len(ns) == 0 {
-		ns = "default"
-	}
-	u, err := r.getRequestURI(PathTanzuKubernetesCluster)
+	u, err := r.getRequestURI(fmt.Sprintf(PathTanzuKubernetesCluster, ns, name))
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf(u.String(), ns, name), nil)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header = map[string][]string{
-		"Content-Type":  {"application/json"},
-		"Authorization": {fmt.Sprintf("Bearer %s", r.Token)},
-	}
-	resp, err := r.httpClient.Do(req)
+
+	resp, err := r.DoRequest(req)
 	if err != nil {
 		return nil, err
 	}
-	body, err := handleResponse(resp)
+
+	body, err := r.handleResponse(resp)
 	if err != nil {
 		return nil, err
 	}
+
 	var cluster v1alpha2.TanzuKubernetesCluster
 	err = json.Unmarshal(body, &cluster)
 	if err != nil {
 		return nil, err
 	}
+
 	return &cluster, nil
 }
 
-func (r *RestClient) Login(ctx context.Context, u, p string) error {
-	r.username = u
-	r.password = p
-
+func (r *RestClient) Login(ctx context.Context, u, p string) (*LoginResponse, error) {
 	uri, err := r.getRequestURI(PathWCPLogin)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, uri.String(), nil)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	req.Header = map[string][]string{
-		"Content-Type":  {"application/json"},
-		"Authorization": {fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s:%s", u, p)))},
-	}
-	resp, err := r.httpClient.Do(req)
+
+	resp, err := r.DoRequest(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	body, err := handleResponse(resp)
+	body, err := r.handleResponse(resp)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var login LoginResponse
 	err = json.Unmarshal(body, &login)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	r.Token = login.SessionID
-	return nil
+
+	return &login, nil
 }
 
 func (r *RestClient) LoginCluster(ctx context.Context, cluster, namespace string) (*LoginClusterResponse, error) {
@@ -363,23 +437,23 @@ func (r *RestClient) LoginCluster(ctx context.Context, cluster, namespace string
 	if len(namespace) > 0 {
 		data = fmt.Sprintf("{\"guest_cluster_name\":\"%s\", \"guest_cluster_namespace\":\"%s\"}", cluster, namespace)
 	}
+
 	uri, err := r.getRequestURI(PathWCPLogin)
 	if err != nil {
 		return nil, err
 	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, uri.String(), bytes.NewBuffer([]byte(data)))
 	if err != nil {
 		return nil, err
 	}
-	req.Header = map[string][]string{
-		"Content-Type":  {"application/json"},
-		"Authorization": {fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s:%s", r.username, r.password)))},
-	}
-	resp, err := r.httpClient.Do(req)
+
+	resp, err := r.DoRequest(req)
 	if err != nil {
 		return nil, err
 	}
-	body, err := handleResponse(resp)
+
+	body, err := r.handleResponse(resp)
 	if err != nil {
 		return nil, err
 	}
@@ -397,15 +471,24 @@ func (r *RestClient) LoginCluster(ctx context.Context, cluster, namespace string
 	return &login, nil
 }
 
-func handleResponse(resp *http.Response) ([]byte, error) {
+func (r *RestClient) handleResponse(resp *http.Response) ([]byte, error) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		r.logger.Debug("error reading response body",
+			"error", err,
+		)
 		return nil, err
 	}
 
 	defer func() {
 		_ = resp.Body.Close()
 	}()
+
+	r.logger.Debug("read http response body",
+		"status_code", resp.StatusCode,
+		"length", len(body),
+		"content_type", resp.Header.Values("Content-Type"),
+	)
 
 	statusOK := resp.StatusCode >= 200 && resp.StatusCode < 300
 	if !statusOK {
@@ -414,13 +497,20 @@ func handleResponse(resp *http.Response) ([]byte, error) {
 	return body, nil
 }
 
-func New(baseURI string) (Client, error) {
+func New(baseURI string, opts ...Option) (Client, error) {
 	u, err := url.ParseRequestURI(baseURI)
 	if err != nil {
 		return nil, err
 	}
-	return &RestClient{
+	c := &RestClient{
 		uri:        u,
 		httpClient: http.DefaultClient,
-	}, nil
+		logger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	return c, nil
 }
