@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
-	"os"
 	"syscall"
 
 	"github.com/middlewaregruppen/tcli/pkg/client"
@@ -92,10 +91,9 @@ Examples:
 			// the port if the user supplied tanzuServer with an explicit port.
 			supervisorK8sServer := fmt.Sprintf("https://%s:6443", u.Hostname())
 
-			logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 			c, err := client.New(
 				tanzuServer,
-				client.WithLogger(logger),
+				client.WithLogger(slog.Default()),
 				client.WithCredentials(client.BasicCredentials(tanzuUsername, tanzuPassword)),
 				client.WithInsecure(insecureSkipVerify),
 			)

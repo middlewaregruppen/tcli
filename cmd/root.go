@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/middlewaregruppen/tcli/cmd/logout"
 	"github.com/middlewaregruppen/tcli/cmd/use"
 	"github.com/middlewaregruppen/tcli/cmd/version"
-	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 
@@ -25,7 +25,7 @@ var (
 	tanzuUsername      string
 	tanzuPassword      string
 	insecureSkipVerify bool
-	verbosity          string
+	debug              bool
 	kubeconfig         string
 	timeout            time.Duration
 )
@@ -55,12 +55,11 @@ func NewDefaultCommand() *cobra.Command {
 	Use "tcli --help" for a list of global command-line options (applies to all commands).
 	`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			logrus.SetOutput(os.Stdout)
-			lvl, err := logrus.ParseLevel(verbosity)
-			if err != nil {
-				return err
+			level := slog.LevelWarn
+			if debug {
+				level = slog.LevelDebug
 			}
-			logrus.SetLevel(lvl)
+			slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
 
 			if err := viper.BindPFlags(cmd.Flags()); err != nil {
 				return err
@@ -84,11 +83,12 @@ func NewDefaultCommand() *cobra.Command {
 
 	homedir, err := os.UserHomeDir()
 	if err != nil {
-		logrus.Fatal(err)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
 	// Setup flags
 	c.PersistentFlags().DurationVar(&timeout, "timeout", 30*time.Second, "How long to wait for an operation before giving up")
-	c.PersistentFlags().StringVarP(&verbosity, "verbosity", "v", "info", "number for the log level verbosity (debug, info, warn, error, fatal, panic)")
+	c.PersistentFlags().BoolVar(&debug, "debug", false, "Enable debug logging (HTTP traces written to stderr)")
 	c.PersistentFlags().StringVarP(&tanzuServer, "server", "s", "", "Address of the server to authenticate against.")
 	c.PersistentFlags().StringVarP(&tanzuUsername, "username", "u", "", "Username to authenticate.")
 	c.PersistentFlags().StringVarP(&tanzuPassword, "password", "p", "", "Password to use for authentication.")

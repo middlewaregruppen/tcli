@@ -3,7 +3,6 @@ module github.com/middlewaregruppen/tcli
 go 1.19
 
 require (
-	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.15.0
 	github.com/vmware-tanzu/tanzu-framework/apis/run v0.0.0-20230419030809-7081502ebf68
