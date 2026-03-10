@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
-	"os"
 
 	"github.com/middlewaregruppen/tcli/pkg/client"
 	"k8s.io/client-go/tools/clientcmd"
@@ -40,10 +39,9 @@ func ClientFromKubeconfig(server, kubeconfigPath, username string, insecure bool
 		return nil, "", err
 	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	c, err := client.New(
 		server,
-		client.WithLogger(logger),
+		client.WithLogger(slog.Default()),
 		client.WithCredentials(client.TokenCredentials(token)),
 		client.WithInsecure(insecure),
 	)
