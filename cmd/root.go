@@ -50,6 +50,7 @@ func NewDefaultCommand() *cobra.Command {
 	export TCLI_SERVER=https://supervisor.local
 	export TCLI_USERNAME=bob
 	export TCLI_PASSWORD=mypassword
+	export TCLI_INSECURE=true
 
 	Use "tcli --help" for a list of global command-line options (applies to all commands).
 	`,
@@ -91,7 +92,7 @@ func NewDefaultCommand() *cobra.Command {
 	c.PersistentFlags().StringVarP(&tanzuServer, "server", "s", "", "Address of the server to authenticate against.")
 	c.PersistentFlags().StringVarP(&tanzuUsername, "username", "u", "", "Username to authenticate.")
 	c.PersistentFlags().StringVarP(&tanzuPassword, "password", "p", "", "Password to use for authentication.")
-	c.PersistentFlags().BoolVarP(&insecureSkipVerify, "insecure", "i", true, "Skip certificate verification (this is insecure).")
+	c.PersistentFlags().BoolVarP(&insecureSkipVerify, "insecure", "i", false, "Skip certificate verification (this is insecure).")
 	c.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", fmt.Sprintf("%s/.kube/config", homedir), "Path to kubeconfig file.")
 
 	// Setup sub-commands

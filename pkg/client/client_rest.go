@@ -128,11 +128,6 @@ func WithLogger(l *slog.Logger) Option {
 	}
 }
 
-func (r *RestClient) SetInsecure(t bool) *RestClient {
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	return r
-}
-
 func (r *RestClient) SetToken(t string) *RestClient {
 	r.Token = t
 	return r
