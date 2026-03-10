@@ -35,10 +35,7 @@ type RestClient struct {
 	uri        *url.URL
 	httpClient *http.Client
 	auth       Credentials
-	username   string
-	password   string
 	Token      string
-	opts       []Option
 	logger     *slog.Logger
 }
 
